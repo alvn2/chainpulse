@@ -1,17 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Search, Plus, Download, TrendingDown, TrendingUp, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, Download, TrendingDown, TrendingUp, AlertCircle, X } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
-const mockInventory = [
-  { sku: 'SKU-RS-NV', name: 'Naivasha Red Roses', category: 'Perishable', unit: 'stems', qty: 450, threshold: 500, warehouse_zone: 'ZONE-B' },
-  { sku: 'SKU-AV-MR', name: 'Hass Avocados', category: 'Perishable', unit: 'kg', qty: 1200, threshold: 1000, warehouse_zone: 'ZONE-C' },
-  { sku: 'SKU-MZ-EL', name: 'Maize Grain', category: 'Dry Store', unit: 'kg', qty: 8500, threshold: 5000, warehouse_zone: 'ZONE-A' },
-  { sku: 'SKU-MLK-LM', name: 'Fresh Milk', category: 'Cold Store', unit: 'liters', qty: 900, threshold: 800, warehouse_zone: 'ZONE-C' },
-  { sku: 'SKU-BX-MD', name: 'Cardboard Box (Medium)', category: 'Dry Store', unit: 'pcs', qty: 280, threshold: 300, warehouse_zone: 'ZONE-A' },
-  { sku: 'SKU-PA-TH', name: 'Thika Pineapples', category: 'Perishable', unit: 'pcs', qty: 0, threshold: 500, warehouse_zone: 'ZONE-C' },
-];
+type InventoryItem = { sku: string; name: string; category: string; unit: string; qty: number; threshold: number; warehouse_zone: string };
 
 const stockChartData = [
   { date: '10/01', stock: 45000 },
@@ -26,16 +19,108 @@ const stockChartData = [
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ sku_id: '', quantity: '', mode: 'add' as 'add' | 'set' });
+  const [saving, setSaving] = useState(false);
 
-  const filtered = mockInventory.filter(i => {
+  async function fetchInventory() {
+    try {
+      const res = await fetch('/api/inventory');
+      const data = await res.json();
+      setInventory(data);
+    } catch (err) {
+      console.error('Failed to fetch inventory:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  async function handleAddStock() {
+    if (!addForm.sku_id || !addForm.quantity) return;
+    setSaving(true);
+    try {
+      await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku_id: addForm.sku_id,
+          quantity: parseInt(addForm.quantity, 10),
+          mode: addForm.mode,
+        }),
+      });
+      setShowAddModal(false);
+      setAddForm({ sku_id: '', quantity: '', mode: 'add' });
+      fetchInventory();
+    } catch (err) {
+      console.error('Failed to update stock:', err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function exportCSV() {
+    const headers = ['SKU', 'Product', 'Category', 'Quantity', 'Unit', 'Threshold', 'Zone', 'Status'];
+    const rows = inventory.map(i => {
+      const status = i.qty === 0 ? 'OUT OF STOCK' : i.qty <= i.threshold ? 'LOW STOCK' : 'HEALTHY';
+      return [i.sku, i.name, i.category, i.qty, i.unit, i.threshold, i.warehouse_zone, status].join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chainpulse-inventory-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleCreatePO(skuId: string) {
+    const item = inventory.find(i => i.sku === skuId);
+    if (!item) return;
+    // Quick PO creation — you'd normally have a form
+    try {
+      await fetch('/api/purchase-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplier_id: 'SUP-01',
+          items: skuId,
+          item_detail: `${item.threshold} ${item.unit}`,
+          total: item.threshold * 35,
+        }),
+      });
+      alert(`Purchase Order created for ${item.name}`);
+    } catch (err) {
+      console.error('Failed to create PO:', err);
+    }
+  }
+
+  const filtered = inventory.filter(i => {
     const matchesSearch = i.name.toLowerCase().includes(searchTerm.toLowerCase()) || i.sku.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'All Categories' || i.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
-  const healthy = mockInventory.filter(i => i.qty > i.threshold).length;
-  const low = mockInventory.filter(i => i.qty <= i.threshold && i.qty > 0).length;
-  const critical = mockInventory.filter(i => i.qty === 0).length;
+  const healthy = inventory.filter(i => i.qty > i.threshold).length;
+  const low = inventory.filter(i => i.qty <= i.threshold && i.qty > 0).length;
+  const critical = inventory.filter(i => i.qty === 0).length;
+
+  if (loading) {
+    return (
+      <div className="p-6 h-full overflow-y-auto flex flex-col gap-6 custom-scrollbar">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="bg-[#111] p-4 rounded border border-[#222]"><div className="skeleton h-4 w-20 mb-2"></div><div className="skeleton h-8 w-12"></div></div>)}
+        </div>
+        <div className="skeleton h-64 rounded-lg"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 h-full overflow-y-auto flex flex-col gap-6 custom-scrollbar">
@@ -47,11 +132,11 @@ export default function InventoryPage() {
           <p className="text-zinc-500 text-sm">Manage global stock levels and warehouse distribution.</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-sm transition">
+          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-[#222] hover:bg-[#333] border border-[#333] rounded text-sm transition">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Export CSV</span>
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#10b981] text-black hover:bg-[#0ea5e9] hover:text-white rounded text-sm font-semibold transition">
+          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#10b981] text-black hover:bg-emerald-400 rounded text-sm font-semibold transition">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Add Stock</span>
           </button>
@@ -62,7 +147,7 @@ export default function InventoryPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
         <div className="bg-[#111111] p-4 rounded border border-[#222222]">
           <div className="text-zinc-500 text-xs font-mono mb-2 uppercase">Total SKUs</div>
-          <div className="text-3xl font-bold">{mockInventory.length}</div>
+          <div className="text-3xl font-bold">{inventory.length}</div>
         </div>
         <div className="bg-[#111111] p-4 rounded border border-[#222222]">
           <div className="text-zinc-500 text-xs font-mono mb-2 uppercase">Healthy Stock</div>
@@ -184,13 +269,16 @@ export default function InventoryPage() {
           <div className="bg-[#111111] rounded border border-[#222222] flex-1 flex flex-col p-4 overflow-hidden">
              <h3 className="text-xs uppercase font-mono tracking-wider text-amber-500 mb-4 border-b border-[#222] pb-2">Action Required</h3>
              <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar">
-               {mockInventory.filter(i => i.qty <= i.threshold).map(item => (
+               {inventory.filter(i => i.qty <= i.threshold).map(item => (
                  <div key={'action-'+item.sku} className="bg-[#1a1a1a] p-3 rounded border border-[#333] hover:border-amber-900/50 transition-colors">
                     <div className="flex justify-between items-start mb-2">
                        <div className="text-sm font-medium">{item.name}</div>
                        <div className="text-[10px] font-mono text-amber-500 bg-amber-950/30 px-1 border border-amber-900/50 rounded">{item.qty} / {item.threshold}</div>
                     </div>
-                    <button className="w-full py-1.5 bg-[#0a0a0a] hover:bg-[#10b981] hover:text-black hover:border-[#10b981] text-zinc-300 rounded text-xs tracking-wider font-mono transition-colors border border-[#333]">
+                    <button 
+                      onClick={() => handleCreatePO(item.sku)}
+                      className="w-full py-1.5 bg-[#0a0a0a] hover:bg-[#10b981] hover:text-black hover:border-[#10b981] text-zinc-300 rounded text-xs tracking-wider font-mono transition-colors border border-[#333]"
+                    >
                       CREATE PO
                     </button>
                  </div>
@@ -199,6 +287,67 @@ export default function InventoryPage() {
           </div>
         </div>
       </div>
+
+      {/* Add Stock Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center" onClick={() => setShowAddModal(false)}>
+          <div className="bg-[#111] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold">Update Stock Level</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-zinc-500 hover:text-white transition"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">SKU</label>
+                <select 
+                  className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981]"
+                  value={addForm.sku_id}
+                  onChange={e => setAddForm({...addForm, sku_id: e.target.value})}
+                >
+                  <option value="">Select SKU...</option>
+                  {inventory.map(i => <option key={i.sku} value={i.sku}>{i.sku} — {i.name} (Current: {i.qty})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Quantity</label>
+                <input 
+                  type="number" 
+                  className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono"
+                  placeholder="Enter quantity..."
+                  value={addForm.quantity}
+                  onChange={e => setAddForm({...addForm, quantity: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Mode</label>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setAddForm({...addForm, mode: 'add'})}
+                    className={`flex-1 py-2 rounded text-sm font-mono border transition ${addForm.mode === 'add' ? 'bg-[#10b981] text-black border-[#10b981]' : 'bg-[#0a0a0a] border-[#333] text-zinc-400 hover:border-zinc-500'}`}
+                  >
+                    + ADD TO STOCK
+                  </button>
+                  <button 
+                    onClick={() => setAddForm({...addForm, mode: 'set'})}
+                    className={`flex-1 py-2 rounded text-sm font-mono border transition ${addForm.mode === 'set' ? 'bg-blue-500 text-white border-blue-500' : 'bg-[#0a0a0a] border-[#333] text-zinc-400 hover:border-zinc-500'}`}
+                  >
+                    = SET LEVEL
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <button 
+              onClick={handleAddStock} 
+              disabled={saving || !addForm.sku_id || !addForm.quantity}
+              className="w-full mt-6 py-3 bg-[#10b981] text-black font-bold rounded text-sm hover:bg-emerald-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'SAVING...' : 'CONFIRM UPDATE'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { Download, Printer } from 'lucide-react';
 
@@ -12,13 +12,6 @@ const mockBarData = [
   { name: 'Fri', breaches: 0 },
   { name: 'Sat', breaches: 2 },
   { name: 'Sun', breaches: 0 },
-];
-
-const mockPieData = [
-  { name: 'In Transit', value: 14 },
-  { name: 'Delayed', value: 3 },
-  { name: 'Breach', value: 2 },
-  { name: 'Delivered', value: 25 },
 ];
 
 const mockAreaData = [
@@ -33,7 +26,91 @@ const mockAreaData = [
 
 const COLORS = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981'];
 
+type DashboardStats = { totalSkus: number; activeShipments: number; coldBreachesToday: number; lowStockItems: number; pendingPOs: number };
+
 export default function ReportsPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [shipmentStats, setShipmentStats] = useState<{ name: string; value: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [statsRes, shipmentsRes] = await Promise.all([
+          fetch('/api/dashboard/stats'),
+          fetch('/api/shipments'),
+        ]);
+        const [statsData, shipmentsData] = await Promise.all([
+          statsRes.json(),
+          shipmentsRes.json(),
+        ]);
+        setStats(statsData);
+
+        // Calculate shipment distribution from real data
+        const statusCounts: Record<string, number> = {};
+        shipmentsData.forEach((s: any) => {
+          statusCounts[s.status] = (statusCounts[s.status] || 0) + 1;
+        });
+        setShipmentStats(Object.entries(statusCounts).map(([name, value]) => ({ name, value })));
+      } catch (err) {
+        console.error('Failed to fetch report data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  function handlePrint() {
+    window.print();
+  }
+
+  function handleExportPDF() {
+    // Generate a simple text report for download
+    const report = `
+CHAINPULSE SUPPLY CHAIN REPORT
+Generated: ${new Date().toLocaleString()}
+================================
+
+SUMMARY METRICS
+- Total SKUs: ${stats?.totalSkus ?? 'N/A'}
+- Active Shipments: ${stats?.activeShipments ?? 'N/A'}
+- Cold Breaches Today: ${stats?.coldBreachesToday ?? 'N/A'}
+- Low Stock Items: ${stats?.lowStockItems ?? 'N/A'}
+- Pending POs: ${stats?.pendingPOs ?? 'N/A'}
+
+COMPLIANCE
+- Cold Chain Compliance: ${stats ? ((1 - stats.coldBreachesToday / Math.max(stats.activeShipments, 1)) * 100).toFixed(1) : '0'}%
+- Inventory Health: ${stats ? (((stats.totalSkus - stats.lowStockItems) / Math.max(stats.totalSkus, 1)) * 100).toFixed(1) : '0'}%
+
+SHIPMENT DISTRIBUTION
+${shipmentStats.map(s => `- ${s.name}: ${s.value}`).join('\n')}
+    `.trim();
+
+    const blob = new Blob([report], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chainpulse-report-${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const totalShipments = shipmentStats.reduce((acc, s) => acc + s.value, 0);
+  const compliance = stats ? ((1 - stats.coldBreachesToday / Math.max(stats.activeShipments, 1)) * 100).toFixed(1) : '0';
+  const inventoryHealth = stats ? (((stats.totalSkus - stats.lowStockItems) / Math.max(stats.totalSkus, 1)) * 100).toFixed(1) : '0';
+
+  if (loading) {
+    return (
+      <div className="p-6 h-full flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="skeleton h-20 rounded-lg"></div>)}
+        </div>
+        <div className="skeleton h-64 rounded-lg"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 h-full flex flex-col gap-6 overflow-y-auto custom-scrollbar">
       <div className="flex justify-between items-center shrink-0 border-l-4 border-emerald-500 pl-3">
@@ -42,31 +119,31 @@ export default function ReportsPage() {
           <p className="text-zinc-500 text-sm mt-1">Cross-sectional analysis of supply chain health.</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#111] hover:bg-[#1a1a1a] border border-[#333] rounded text-[10px] font-mono tracking-widest uppercase transition-colors">
+          <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-[#111] hover:bg-[#1a1a1a] border border-[#333] rounded text-[10px] font-mono tracking-widest uppercase transition-colors">
             <Printer className="w-3.5 h-3.5" /> Print
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#111] hover:bg-[#1a1a1a] border border-[#333] rounded text-[10px] font-mono tracking-widest uppercase transition-colors text-emerald-500 border-emerald-900/30">
-            <Download className="w-3.5 h-3.5" /> Export PDF
+          <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2 bg-[#111] hover:bg-[#1a1a1a] border border-[#333] rounded text-[10px] font-mono tracking-widest uppercase transition-colors text-emerald-500 border-emerald-900/30">
+            <Download className="w-3.5 h-3.5" /> Export Report
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
          <div className="bg-[#111] p-4 rounded-lg border border-[#222]">
-           <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Inventory Turnover</div>
-           <div className="text-2xl font-bold text-white font-mono">14.2x</div>
+           <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Total SKUs</div>
+           <div className="text-2xl font-bold text-white font-mono">{stats?.totalSkus ?? 0}</div>
          </div>
          <div className="bg-[#111] p-4 rounded-lg border border-[#222]">
            <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Cold Chain Compliance</div>
-           <div className="text-2xl font-bold text-emerald-500 font-mono">98.5%</div>
+           <div className="text-2xl font-bold text-emerald-500 font-mono">{compliance}%</div>
          </div>
          <div className="bg-[#111] p-4 rounded-lg border border-[#222]">
-           <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Supplier Performance</div>
-           <div className="text-2xl font-bold text-blue-400 font-mono">92.0%</div>
+           <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Inventory Health</div>
+           <div className="text-2xl font-bold text-blue-400 font-mono">{inventoryHealth}%</div>
          </div>
          <div className="bg-[#111] p-4 rounded-lg border border-[#222]">
-           <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Shipment Delays</div>
-           <div className="text-2xl font-bold text-amber-500 font-mono">3.4%</div>
+           <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Pending POs</div>
+           <div className="text-2xl font-bold text-amber-500 font-mono">{stats?.pendingPOs ?? 0}</div>
          </div>
       </div>
 
@@ -124,14 +201,14 @@ export default function ReportsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={mockPieData}
+                    data={shipmentStats}
                     innerRadius={60}
                     outerRadius={80}
                     paddingAngle={5}
                     dataKey="value"
                     stroke="none"
                   >
-                    {mockPieData.map((entry, index) => (
+                    {shipmentStats.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -141,13 +218,13 @@ export default function ReportsPage() {
                 </PieChart>
               </ResponsiveContainer>
                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                 <div className="text-xl font-bold font-mono">44</div>
+                 <div className="text-xl font-bold font-mono">{totalShipments}</div>
                  <div className="text-[10px] text-zinc-500 uppercase tracking-widest">Total</div>
                </div>
             </div>
             
             <div className="w-1/2 flex flex-col justify-center gap-3 pl-4 border-l border-[#222]">
-              {mockPieData.map((d, i) => (
+              {shipmentStats.map((d, i) => (
                 <div key={d.name} className="flex items-center justify-between text-xs font-mono">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>

@@ -26,7 +26,6 @@ export async function GET(req: NextRequest) {
       `;
     }
 
-    // Map columns to standard format
     const formatted = shipments.map(s => ({
       id: s.id,
       batch: s.batch_name,
@@ -36,19 +35,37 @@ export async function GET(req: NextRequest) {
       temp: parseFloat(s.current_temp) || 0,
       status: s.status,
       eta: s.eta,
-      lastUpdate: s.created_at
+      progress: s.progress,
+      lastUpdate: s.created_at,
     }));
 
     return NextResponse.json(formatted);
   } catch (error: any) {
     console.error("DB Error in shipments:", error.message);
-    return NextResponse.json([
-      { id: 'SHP-782', batch: 'Naivasha Roses B.007', origin: 'Naivasha Farm', destination: 'JKIA Export Hub', driver: 'Kipchoge K.', temp: 9.4, status: 'BREACH', lastUpdate: new Date().toISOString() },
-      { id: 'SHP-785', batch: 'Muranga Avocado R.3', origin: 'Muranga DC', destination: 'Mombasa Port', driver: 'Mwangi J.', temp: 4.2, status: 'IN TRANSIT', lastUpdate: new Date().toISOString() },
-      { id: 'SHP-789', batch: 'Limuru Tea Box B.2', origin: 'Limuru HQ', destination: 'Westlands DC', driver: 'Njoroge P.', temp: 8.1, status: 'DELAYED', lastUpdate: new Date().toISOString() },
-      { id: 'SHP-791', batch: 'Eldoret Berries B.04', origin: 'Eldoret North', destination: 'JKIA Export Hub', driver: 'Ochieng D.', temp: 3.8, status: 'IN TRANSIT', lastUpdate: new Date().toISOString() },
-      { id: 'SHP-792', batch: 'Naivasha Carnations', origin: 'Naivasha Farm', destination: 'Mombasa Port', driver: 'Kamau R.', temp: 11.2, status: 'BREACH', lastUpdate: new Date().toISOString() },
-    ]);
+    return NextResponse.json([], { status: 500 });
   }
 }
 
+export async function POST(req: NextRequest) {
+  try {
+    const sql = getDb();
+    const body = await req.json();
+    const { batch, origin, destination, driver } = body;
+
+    if (!batch || !origin || !destination || !driver) {
+      return NextResponse.json({ error: 'All fields required' }, { status: 400 });
+    }
+
+    const id = `SHP-${Date.now().toString().slice(-3)}`;
+    
+    await sql`
+      INSERT INTO shipments (id, batch_name, origin, destination, driver_name, status, eta, progress)
+      VALUES (${id}, ${batch}, ${origin}, ${destination}, ${driver}, 'LOADING', '-', 0)
+    `;
+
+    return NextResponse.json({ success: true, id });
+  } catch (error: any) {
+    console.error("DB Error creating shipment:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

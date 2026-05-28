@@ -1,22 +1,73 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Truck, MapPin, Search, Calendar, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Truck, MapPin, Search, Calendar, X, Plus } from 'lucide-react';
 
-const mockShipments = [
-  { id: 'SHP-782', batch: 'Naivasha Roses B.007', origin: 'Naivasha Farm', destination: 'JKIA Export Hub', driver: 'Kipchoge K.', temp: 9.4, status: 'BREACH', lastUpdate: '2023-11-01T10:00:00Z', progress: 45 },
-  { id: 'SHP-785', batch: 'Muranga Avocado R.3', origin: 'Muranga DC', destination: 'Mombasa Port', driver: 'Mwangi J.', temp: 4.2, status: 'IN TRANSIT', lastUpdate: '2023-11-01T10:05:00Z', progress: 78 },
-  { id: 'SHP-789', batch: 'Limuru Tea Box B.2', origin: 'Limuru HQ', destination: 'Westlands DC', driver: 'Njoroge P.', temp: 8.1, status: 'DELAYED', lastUpdate: '2023-11-01T09:45:00Z', progress: 20 },
-  { id: 'SHP-791', batch: 'Eldoret Berries B.04', origin: 'Eldoret North', destination: 'JKIA Export Hub', driver: 'Ochieng D.', temp: 3.8, status: 'IN TRANSIT', lastUpdate: '2023-11-01T10:15:00Z', progress: 10 },
-  { id: 'SHP-792', batch: 'Naivasha Carnations', origin: 'Naivasha Farm', destination: 'Mombasa Port', driver: 'Kamau R.', temp: 11.2, status: 'BREACH', lastUpdate: '2023-11-01T10:20:00Z', progress: 65 },
-  { id: 'SHP-772', batch: 'Kitale Maize Exp', origin: 'Kitale Whouse', destination: 'Nakuru Hub', driver: 'Mutua S.', temp: 0, status: 'DELIVERED', lastUpdate: '2023-10-31T18:00:00Z', progress: 100 },
-];
+type Shipment = { id: string; batch: string; origin: string; destination: string; driver: string; temp: number; status: string; lastUpdate: string; progress: number; eta: string };
 
 export default function ShipmentsPage() {
   const [filter, setFilter] = useState('ALL');
-  const [selectedShipment, setSelectedShipment] = useState(mockShipments[0]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({ batch: '', origin: '', destination: '', driver: '' });
+  const [saving, setSaving] = useState(false);
 
-  const filtered = filter === 'ALL' ? mockShipments : mockShipments.filter(s => s.status === filter);
+  async function fetchShipments() {
+    try {
+      const res = await fetch(`/api/shipments?status=${filter}`);
+      const data = await res.json();
+      setShipments(data);
+      if (data.length > 0 && !selectedShipment) {
+        setSelectedShipment(data[0]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch shipments:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchShipments();
+  }, [filter]);
+
+  async function handleCreateShipment() {
+    if (!createForm.batch || !createForm.origin || !createForm.destination || !createForm.driver) return;
+    setSaving(true);
+    try {
+      await fetch('/api/shipments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createForm),
+      });
+      setShowCreateModal(false);
+      setCreateForm({ batch: '', origin: '', destination: '', driver: '' });
+      fetchShipments();
+    } catch (err) {
+      console.error('Failed to create shipment:', err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const filtered = searchTerm 
+    ? shipments.filter(s => s.id.toLowerCase().includes(searchTerm.toLowerCase()) || s.batch.toLowerCase().includes(searchTerm.toLowerCase()))
+    : shipments;
+
+  if (loading) {
+    return (
+      <div className="p-6 h-full flex flex-col gap-6">
+        <div className="skeleton h-10 w-64 rounded"></div>
+        <div className="flex gap-6 flex-1">
+          <div className="w-1/3 space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="skeleton h-32 rounded-lg"></div>)}</div>
+          <div className="flex-1 skeleton rounded-lg"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 h-full flex flex-col gap-6 overflow-hidden">
@@ -27,14 +78,14 @@ export default function ShipmentsPage() {
           <p className="text-zinc-500 text-sm mt-1 pl-4">End-to-end trace view of all consignments.</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white font-semibold flex items-center justify-center rounded text-sm transition font-mono tracking-widest">
-            CREATE SHIPMENT
+          <button onClick={() => setShowCreateModal(true)} className="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white font-semibold flex items-center gap-2 rounded text-sm transition font-mono tracking-widest">
+            <Plus className="w-4 h-4" /> CREATE SHIPMENT
           </button>
         </div>
       </div>
 
       {/* Control Bar */}
-      <div className="flex gap-4 items-center shrink-0">
+      <div className="flex gap-4 items-center shrink-0 flex-wrap">
         <div className="flex bg-[#111] p-1 border border-[#222] rounded text-sm">
           {['ALL', 'LOADING', 'IN TRANSIT', 'DELAYED', 'BREACH', 'DELIVERED'].map(f => (
             <button 
@@ -47,12 +98,15 @@ export default function ShipmentsPage() {
           ))}
         </div>
         <div className="flex-1"></div>
-        <div className="flex items-center gap-2 bg-[#111] border border-[#222] px-3 py-1.5 rounded text-sm text-zinc-400 cursor-pointer hover:bg-[#1a1a1a] transition-colors">
-           <Calendar className="w-4 h-4" /> <span className="text-xs">This Week</span>
-        </div>
         <div className="flex items-center gap-2 bg-[#111] border border-[#222] px-3 py-1.5 rounded text-sm w-48 focus-within:border-[#3b82f6] transition-colors">
            <Search className="w-4 h-4 text-zinc-500" />
-           <input type="text" placeholder="Search ID..." className="bg-transparent border-none outline-none w-full font-mono placeholder:font-sans text-xs" />
+           <input 
+             type="text" 
+             placeholder="Search ID..." 
+             className="bg-transparent border-none outline-none w-full font-mono placeholder:font-sans text-xs"
+             value={searchTerm}
+             onChange={e => setSearchTerm(e.target.value)}
+           />
         </div>
       </div>
 
@@ -60,10 +114,10 @@ export default function ShipmentsPage() {
       <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
          {/* List View */}
          <div className="w-1/2 lg:w-1/3 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
-            {filtered.length === 0 && <div className="text-zinc-500 text-sm p-4 text-center">No shipments match status &apos;{filter}&apos;.</div>}
+            {filtered.length === 0 && <div className="text-zinc-500 text-sm p-4 text-center">No shipments match filter.</div>}
             
             {filtered.map(s => {
-              const isSelected = selectedShipment.id === s.id;
+              const isSelected = selectedShipment?.id === s.id;
               return (
                 <div 
                   key={s.id} 
@@ -108,7 +162,7 @@ export default function ShipmentsPage() {
             })}
          </div>
 
-         {/* Detail Panel Placeholder */}
+         {/* Detail Panel */}
          <div className="hidden lg:flex flex-1 bg-[#111] border border-[#222] rounded-lg flex-col overflow-hidden relative">
             <div className="absolute top-4 left-4 z-10 bg-[#0a0a0a] border border-[#333] px-3 py-1.5 rounded flex items-center gap-2">
               <span className="w-2 h-2 bg-[#10b981] rounded-full animate-pulse"></span>
@@ -118,36 +172,84 @@ export default function ShipmentsPage() {
              <div className="flex-1 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')] flex items-center justify-center pointer-events-none border-b border-[#222]">
                  <div className="text-center">
                     <MapPin className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
-                    <p className="text-zinc-400 font-mono uppercase tracking-widest text-sm">Interactive Map Engine Offline</p>
+                    <p className="text-zinc-400 font-mono uppercase tracking-widest text-sm">Map Engine • Coming Soon</p>
                  </div>
              </div>
 
-             <div className="h-[250px] bg-[#161616] p-6 flex flex-col justify-between shrink-0">
-               <div>
-                  <h3 className="font-mono text-xl font-bold text-white mb-1">{selectedShipment?.id}</h3>
-                  <p className="text-zinc-400 text-sm">{selectedShipment?.batch}</p>
+             {selectedShipment && (
+               <div className="h-[250px] bg-[#161616] p-6 flex flex-col justify-between shrink-0">
+                 <div>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-mono text-xl font-bold text-white mb-1">{selectedShipment.id}</h3>
+                        <p className="text-zinc-400 text-sm">{selectedShipment.batch}</p>
+                      </div>
+                      <StatusBadge status={selectedShipment.status} />
+                    </div>
+                 </div>
+                 
+                 <div className="grid grid-cols-4 gap-4 mt-6">
+                   <div className="bg-[#0a0a0a] border border-[#222] rounded p-3 text-center">
+                     <div className="text-[10px] font-mono text-zinc-500 uppercase mb-1">Driver</div>
+                     <div className="font-mono text-sm text-zinc-300 truncate">{selectedShipment.driver}</div>
+                   </div>
+                   <div className="bg-[#0a0a0a] border border-[#222] rounded p-3 text-center">
+                     <div className="text-[10px] font-mono text-zinc-500 uppercase mb-1">Temperature</div>
+                     <div className={`font-mono text-lg ${selectedShipment.temp > 8 ? 'text-red-500' : 'text-[#10b981]'}`}>{selectedShipment.status === 'DELIVERED' ? '-' : selectedShipment.temp.toFixed(1)} <span className="text-xs">°C</span></div>
+                   </div>
+                   <div className="bg-[#0a0a0a] border border-[#222] rounded p-3 text-center">
+                     <div className="text-[10px] font-mono text-zinc-500 uppercase mb-1">ETA</div>
+                     <div className="font-mono text-lg text-zinc-300">{selectedShipment.eta}</div>
+                   </div>
+                   <div className="bg-[#0a0a0a] border border-[#222] rounded p-3 text-center">
+                     <div className="text-[10px] font-mono text-zinc-500 uppercase mb-1">Progress</div>
+                     <div className="font-mono text-lg text-blue-400">{selectedShipment.progress}%</div>
+                   </div>
+                 </div>
                </div>
-               
-               <div className="grid grid-cols-4 gap-4 mt-6">
-                 <div className="bg-[#0a0a0a] border border-[#222] rounded p-3 text-center">
-                   <div className="text-[10px] font-mono text-zinc-500 uppercase mb-1">Current Speed</div>
-                   <div className="font-mono text-lg text-zinc-300">{selectedShipment?.status === 'DELIVERED' ? '0' : '65'} <span className="text-xs">km/h</span></div>
-                 </div>
-                 <div className="bg-[#0a0a0a] border border-[#222] rounded p-3 text-center">
-                   <div className="text-[10px] font-mono text-zinc-500 uppercase mb-1">Temperature</div>
-                   <div className={`font-mono text-lg ${selectedShipment?.temp! > 8 ? 'text-red-500' : 'text-[#10b981]'}`}>{selectedShipment?.status === 'DELIVERED' ? '-' : selectedShipment?.temp.toFixed(1)} <span className="text-xs">°C</span></div>
-                 </div>
-                 <div className="bg-[#0a0a0a] border border-[#222] rounded p-3 text-center">
-                   <div className="text-[10px] font-mono text-zinc-500 uppercase mb-1">Estimated Arrival</div>
-                   <div className="font-mono text-lg text-zinc-300">14:00</div>
-                 </div>
-                 <div className="bg-[#0a0a0a] border border-[#222] rounded p-3 flex items-center justify-center bg-blue-950/20 hover:bg-blue-950/40 cursor-pointer border-blue-900/50 transition-colors">
-                   <div className="text-xs font-mono text-blue-400 uppercase tracking-widest text-center">View Full<br/>SMS Logs</div>
-                 </div>
-               </div>
-             </div>
+             )}
          </div>
       </div>
+
+      {/* Create Shipment Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center" onClick={() => setShowCreateModal(false)}>
+          <div className="bg-[#111] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold flex items-center gap-2"><Truck className="w-5 h-5 text-blue-400" /> New Shipment</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-zinc-500 hover:text-white transition"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="space-y-4">
+              {[
+                { label: 'Batch Name', key: 'batch' as const, placeholder: 'e.g. Naivasha Roses B.008' },
+                { label: 'Origin', key: 'origin' as const, placeholder: 'e.g. Naivasha Farm' },
+                { label: 'Destination', key: 'destination' as const, placeholder: 'e.g. JKIA Export Hub' },
+                { label: 'Driver', key: 'driver' as const, placeholder: 'e.g. Kipchoge K.' },
+              ].map(field => (
+                <div key={field.key}>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">{field.label}</label>
+                  <input 
+                    type="text" 
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    placeholder={field.placeholder}
+                    value={createForm[field.key]}
+                    onChange={e => setCreateForm({...createForm, [field.key]: e.target.value})}
+                  />
+                </div>
+              ))}
+            </div>
+            
+            <button 
+              onClick={handleCreateShipment} 
+              disabled={saving || !createForm.batch || !createForm.origin || !createForm.destination || !createForm.driver}
+              className="w-full mt-6 py-3 bg-blue-500 text-white font-bold rounded text-sm hover:bg-blue-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'CREATING...' : 'CREATE SHIPMENT'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
