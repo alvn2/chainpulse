@@ -33,7 +33,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Shipments", href: "/shipments", icon: <Truck className="w-4 h-4" /> },
     { name: "Suppliers", href: "/suppliers", icon: <Users className="w-4 h-4" /> },
     { name: "Reports", href: "/reports", icon: <BarChart3 className="w-4 h-4" /> },
-    { name: "SMS Guide", href: "/sms-guide", icon: <MessageSquare className="w-4 h-4" /> },
+    { name: "Message Center", href: "/sms-guide", icon: <MessageSquare className="w-4 h-4" /> },
   ];
 
   // Fetch alerts for the dropdown (only if not on landing/auth pages)

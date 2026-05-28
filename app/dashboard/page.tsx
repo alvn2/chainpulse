@@ -15,10 +15,6 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // SMS Simulator State
-  const [smsMsg, setSmsMsg] = useState('');
-  const [smsSending, setSmsSending] = useState(false);
-
   async function fetchData() {
     try {
       const [statsRes, shipmentsRes, alertsRes] = await Promise.all([
@@ -52,28 +48,6 @@ export default function DashboardPage() {
     };
   }, []);
 
-  async function handleSimulateSms(e: React.FormEvent) {
-    e.preventDefault();
-    if (!smsMsg) return;
-    setSmsSending(true);
-    try {
-      const payload = new URLSearchParams();
-      payload.append('from', '+254700000000');
-      payload.append('text', smsMsg);
-      await fetch('/api/at/inbound', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: payload.toString()
-      });
-      setSmsMsg('');
-      // Instantly refresh dashboard to show new data/alerts
-      fetchData();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSmsSending(false);
-    }
-  }
 
   if (loading) {
     return (
@@ -179,34 +153,6 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-          
-          {/* SMS Simulator Widget replacing placeholder */}
-          <div className="h-[200px] shrink-0 bg-[#111111] border border-[#222222] rounded-lg relative overflow-hidden flex flex-col p-4">
-             <div className="flex justify-between items-center mb-4 border-b border-[#222] pb-2">
-                <div className="flex items-center gap-2">
-                   <Smartphone className="w-5 h-5 text-emerald-500" />
-                   <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-500">Live SMS Simulator</h2>
-                </div>
-                <Link href="/sms-guide" className="text-[10px] font-mono text-zinc-500 hover:text-white transition">VIEW COMMANDS →</Link>
-             </div>
-             <p className="text-xs text-zinc-400 mb-4">Demo the Africa's Talking webhook instantly. Try sending: <code className="text-emerald-400 bg-black px-1 rounded">TEMP 12 SHP-1001</code></p>
-             <form onSubmit={handleSimulateSms} className="flex gap-2 mt-auto">
-               <input 
-                 type="text" 
-                 value={smsMsg}
-                 onChange={e => setSmsMsg(e.target.value)}
-                 placeholder="Enter SMS command..."
-                 className="flex-1 bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono uppercase"
-               />
-               <button 
-                 type="submit"
-                 disabled={smsSending || !smsMsg}
-                 className="px-4 py-2 bg-[#10b981] text-black font-bold rounded text-sm hover:bg-emerald-400 transition disabled:opacity-50 flex items-center gap-2"
-               >
-                 <Send className="w-4 h-4" /> Send
-               </button>
-             </form>
           </div>
         </div>
 
