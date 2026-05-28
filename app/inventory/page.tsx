@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Download, TrendingDown, TrendingUp, AlertCircle, X, PackagePlus } from 'lucide-react';
+import { Search, Plus, Download, TrendingDown, TrendingUp, AlertCircle, X, PackagePlus, Trash2, Pencil } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 type InventoryItem = { sku: string; name: string; category: string; unit: string; qty: number; threshold: number; warehouse_zone: string };
@@ -27,6 +27,7 @@ export default function InventoryPage() {
   const [modalTab, setModalTab] = useState<'update' | 'create'>('update');
   const [addForm, setAddForm] = useState({ sku_id: '', quantity: '', mode: 'add' as 'add' | 'set' });
   const [createForm, setCreateForm] = useState({ sku_id: '', name: '', category: 'Perishable', unit: 'pcs', threshold: '100', zone: 'ZONE-A' });
+  const [editForm, setEditForm] = useState<InventoryItem | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function fetchInventory() {
@@ -98,6 +99,50 @@ export default function InventoryPage() {
       console.error('Failed to create SKU:', err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleEditSubmit() {
+    if (!editForm) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/inventory', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku_id: editForm.sku,
+          name: editForm.name,
+          category: editForm.category,
+          unit: editForm.unit,
+          threshold: editForm.threshold,
+          zone: editForm.warehouse_zone
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        setEditForm(null);
+        fetchInventory();
+      }
+    } catch (err) {
+      console.error('Failed to edit SKU:', err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteSKU(skuId: string) {
+    if (!confirm('Are you sure you want to delete this SKU and all its stock history?')) return;
+    try {
+      const res = await fetch(`/api/inventory?id=${encodeURIComponent(skuId)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.error) alert(data.error);
+      else fetchInventory();
+    } catch (err) {
+      console.error('Failed to delete SKU:', err);
     }
   }
 
@@ -244,6 +289,7 @@ export default function InventoryPage() {
                     <th className="p-4 font-normal text-right">Quantity</th>
                     <th className="p-4 font-normal text-center">Status</th>
                     <th className="p-4 font-normal">Zone</th>
+                    <th className="p-4 font-normal text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#222]">
@@ -273,6 +319,10 @@ export default function InventoryPage() {
                            )}
                         </td>
                         <td className="p-4 text-xs font-mono text-zinc-400">{item.warehouse_zone}</td>
+                        <td className="p-4 text-right">
+                          <button onClick={(e) => { e.stopPropagation(); setEditForm(item); }} className="p-1.5 text-zinc-500 hover:text-blue-400 hover:bg-blue-900/20 rounded transition mr-2"><Pencil className="w-4 h-4" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteSKU(item.sku); }} className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-900/20 rounded transition"><Trash2 className="w-4 h-4" /></button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -476,6 +526,82 @@ export default function InventoryPage() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Edit Modal */}
+      {editForm && (
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4" onClick={() => setEditForm(null)}>
+          <div className="bg-[#111] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Edit SKU: {editForm.sku}</h3>
+              <button onClick={() => setEditForm(null)} className="text-zinc-500 hover:text-white transition"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="space-y-4 mt-4">
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Product Name</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  value={editForm.name}
+                  onChange={e => setEditForm({...editForm, name: e.target.value})}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Category</label>
+                  <select 
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    value={editForm.category}
+                    onChange={e => setEditForm({...editForm, category: e.target.value})}
+                  >
+                    <option>Perishable</option>
+                    <option>Dry Store</option>
+                    <option>Cold Store</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Unit</label>
+                  <input 
+                    type="text" 
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    value={editForm.unit}
+                    onChange={e => setEditForm({...editForm, unit: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Threshold</label>
+                  <input 
+                    type="number" 
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500 font-mono"
+                    value={editForm.threshold}
+                    onChange={e => setEditForm({...editForm, threshold: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Zone</label>
+                  <select 
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    value={editForm.warehouse_zone}
+                    onChange={e => setEditForm({...editForm, warehouse_zone: e.target.value})}
+                  >
+                    <option>ZONE-A</option>
+                    <option>ZONE-B</option>
+                    <option>ZONE-C</option>
+                  </select>
+                </div>
+              </div>
+              <button 
+                onClick={handleEditSubmit} 
+                disabled={saving || !editForm.name}
+                className="w-full mt-6 py-3 bg-blue-500 text-white font-bold rounded text-sm hover:bg-blue-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'SAVING...' : 'SAVE CHANGES'}
+              </button>
+            </div>
           </div>
         </div>
       )}

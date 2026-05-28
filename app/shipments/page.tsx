@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Truck, MapPin, Search, Calendar, X, Plus } from 'lucide-react';
+import { Truck, MapPin, Search, Calendar, X, Plus, Trash2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const ShipmentMap = dynamic(() => import('@/components/ShipmentMap'), { 
@@ -58,6 +58,23 @@ export default function ShipmentsPage() {
       console.error('Failed to create shipment:', err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteShipment(shipmentId: string) {
+    if (!confirm('Are you sure you want to delete this shipment? All telemetry logs will be lost.')) return;
+    try {
+      const res = await fetch(`/api/shipments?id=${encodeURIComponent(shipmentId)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.error) alert(data.error);
+      else {
+        if (selectedShipment?.id === shipmentId) setSelectedShipment(null);
+        fetchShipments();
+      }
+    } catch (err) {
+      console.error('Failed to delete shipment:', err);
     }
   }
 
@@ -137,7 +154,13 @@ export default function ShipmentsPage() {
                       <div className="text-xs font-mono text-blue-400 mb-1">#{s.id.replace('SHP-', '')}</div>
                       <div className="font-semibold text-zinc-200">{s.batch}</div>
                     </div>
-                    <div className="text-right">
+                    <div className="flex gap-2 items-center">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteShipment(s.id); }} 
+                        className="p-1 text-zinc-600 hover:text-red-400 hover:bg-red-900/20 rounded transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                       <StatusBadge status={s.status} />
                     </div>
                   </div>

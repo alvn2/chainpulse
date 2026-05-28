@@ -92,3 +92,50 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    const sql = getDb();
+    const body = await req.json();
+    const { sku_id, name, category, unit, threshold, zone } = body;
+    
+    if (!sku_id) {
+      return NextResponse.json({ error: 'SKU ID required' }, { status: 400 });
+    }
+
+    await sql`
+      UPDATE skus 
+      SET name = ${name}, category = ${category}, unit = ${unit}, 
+          reorder_threshold = ${threshold}, warehouse_zone = ${zone}
+      WHERE id = ${sku_id}
+    `;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("DB Error editing SKU:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const sql = getDb();
+    const { searchParams } = new URL(req.url);
+    const sku_id = searchParams.get('id');
+
+    if (!sku_id) {
+      return NextResponse.json({ error: 'SKU ID required' }, { status: 400 });
+    }
+
+    // Delete stock_levels first (foreign key constraint)
+    await sql`DELETE FROM stock_levels WHERE sku_id = ${sku_id}`;
+    
+    // Delete SKU
+    await sql`DELETE FROM skus WHERE id = ${sku_id}`;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("DB Error deleting SKU:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Users, Phone, Star, FileText, Plus, X, CheckCircle } from 'lucide-react';
+import { Users, Phone, Star, FileText, Plus, X, CheckCircle, Trash2, Pencil, Building2 } from 'lucide-react';
 
 type Supplier = { id: string; name: string; location: string; cat: string; phone: string; score: number; activePOs: number };
 type PO = { id: string; supplier_id: string; supplier_name: string; items: string; item_detail: string; total: number; status: string; expected: string; created_at: string };
@@ -17,6 +17,11 @@ export default function SuppliersPage() {
   const [saving, setSaving] = useState(false);
   const [sendingSMS, setSendingSMS] = useState(false);
   const [receivingId, setReceivingId] = useState<string | null>(null);
+
+  // New CRUD States
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({ id: '', name: '', location: '', category: 'Perishable', phone: '' });
+  const [editSupplierForm, setEditSupplierForm] = useState<Supplier | null>(null);
 
   async function fetchData() {
     try {
@@ -48,10 +53,58 @@ export default function SuppliersPage() {
       setShowPOModal(false);
       setPOForm({ supplier_id: '', items: '', item_detail: '', total: '' });
       fetchData();
-    } catch (err) {
-      console.error('Failed to create PO:', err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeletePO(poId: string) {
+    if (!confirm('Are you sure you want to delete this Purchase Order?')) return;
+    try {
+      const res = await fetch(`/api/purchase-orders?id=${encodeURIComponent(poId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.error) alert(data.error);
+      else fetchData();
+    } catch (err) {
+      console.error('Failed to delete PO:', err);
+    }
+  }
+
+  async function handleSaveSupplier(mode: 'create' | 'edit') {
+    const payload = mode === 'create' ? supplierForm : editSupplierForm;
+    if (!payload || !payload.id || !payload.name) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/suppliers', {
+        method: mode === 'create' ? 'POST' : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        setShowSupplierModal(false);
+        setEditSupplierForm(null);
+        if (mode === 'create') setSupplierForm({ id: '', name: '', location: '', category: 'Perishable', phone: '' });
+        fetchData();
+      }
+    } catch (err) {
+      console.error(`Failed to ${mode} supplier:`, err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteSupplier(supId: string) {
+    if (!confirm('Are you sure you want to delete this Supplier? All related Purchase Orders will also be deleted.')) return;
+    try {
+      const res = await fetch(`/api/suppliers?id=${encodeURIComponent(supId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.error) alert(data.error);
+      else fetchData();
+    } catch (err) {
+      console.error('Failed to delete supplier:', err);
     }
   }
 
@@ -127,7 +180,10 @@ export default function SuppliersPage() {
           <p className="text-zinc-500 text-sm mt-1">Manage vendor relations and purchase orders.</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => setShowPOModal(true)} className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold font-mono tracking-widest rounded text-xs transition flex items-center gap-2">
+          <button onClick={() => setShowSupplierModal(true)} className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold font-mono tracking-widest rounded text-xs transition flex items-center gap-2 border border-[#333]">
+            <Building2 className="w-4 h-4" /> NEW SUPPLIER
+          </button>
+          <button onClick={() => setShowPOModal(true)} className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold font-mono tracking-widest rounded text-xs transition flex items-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.3)]">
             <Plus className="w-4 h-4" /> CREATE PO
           </button>
         </div>
@@ -136,14 +192,20 @@ export default function SuppliersPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
         {suppliers.map(sup => (
           <div key={sup.id} className="bg-[#111] border border-[#222] rounded-lg p-5 flex flex-col hover:border-[#444] transition group">
-            <div className="flex justify-between items-start mb-5">
+            <div className="flex justify-between items-start mb-5 relative">
                <div>
                  <h3 className="font-bold text-white leading-tight font-sans text-lg">{sup.name}</h3>
                  <div className="text-xs text-zinc-500 font-mono tracking-tight mt-1">{sup.location} • {sup.cat}</div>
                </div>
-               <div className="flex items-center gap-1.5 bg-[#0a0a0a] border border-[#333] px-2.5 py-1.5 rounded shadow-inner">
-                 <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                 <span className="text-[10px] font-mono font-bold text-amber-500">{sup.score}</span>
+               <div className="flex flex-col items-end gap-2">
+                 <div className="flex items-center gap-1.5 bg-[#0a0a0a] border border-[#333] px-2.5 py-1.5 rounded shadow-inner">
+                   <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                   <span className="text-[10px] font-mono font-bold text-amber-500">{sup.score}</span>
+                 </div>
+                 <div className="flex gap-1">
+                   <button onClick={() => setEditSupplierForm(sup)} className="p-1 text-zinc-600 hover:text-blue-400 transition bg-[#0a0a0a] rounded border border-[#333]"><Pencil className="w-3 h-3" /></button>
+                   <button onClick={() => handleDeleteSupplier(sup.id)} className="p-1 text-zinc-600 hover:text-red-400 transition bg-[#0a0a0a] rounded border border-[#333]"><Trash2 className="w-3 h-3" /></button>
+                 </div>
                </div>
             </div>
             
@@ -215,17 +277,22 @@ export default function SuppliersPage() {
                          <span className={`${poStatusColors[po.status] || ''} border px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-widest`}>{po.status}</span>
                       </td>
                       <td className="p-4 text-center">
-                         {po.status !== 'RECEIVED' ? (
-                           <button 
-                             onClick={(e) => { e.stopPropagation(); handleReceivePO(po.id); }}
-                             disabled={receivingId === po.id}
-                             className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/50 hover:bg-emerald-500/20 hover:border-emerald-500 rounded flex items-center justify-center gap-1 mx-auto transition-colors disabled:opacity-50"
-                           >
-                             <CheckCircle className="w-3 h-3" /> {receivingId === po.id ? '...' : 'RECEIVE'}
+                         <div className="flex items-center justify-center gap-2">
+                           {po.status !== 'RECEIVED' ? (
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); handleReceivePO(po.id); }}
+                               disabled={receivingId === po.id}
+                               className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/50 hover:bg-emerald-500/20 hover:border-emerald-500 rounded flex items-center justify-center gap-1 transition-colors disabled:opacity-50"
+                             >
+                               <CheckCircle className="w-3 h-3" /> {receivingId === po.id ? '...' : 'RECEIVE'}
+                             </button>
+                           ) : (
+                             <span className="text-zinc-600 text-[10px] px-3 py-1">VERIFIED</span>
+                           )}
+                           <button onClick={(e) => { e.stopPropagation(); handleDeletePO(po.id); }} className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-red-900/20 rounded transition">
+                             <Trash2 className="w-4 h-4" />
                            </button>
-                         ) : (
-                           <span className="text-zinc-600 text-[10px]">VERIFIED</span>
-                         )}
+                         </div>
                       </td>
                    </tr>
                  ))}
@@ -322,6 +389,66 @@ export default function SuppliersPage() {
               className="w-full mt-6 py-3 bg-emerald-600 text-white font-bold rounded text-sm hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {sendingSMS ? 'SENDING...' : 'SEND SMS'}
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Supplier Modal (Create/Edit) */}
+      {(showSupplierModal || editSupplierForm) && (
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center" onClick={() => { setShowSupplierModal(false); setEditSupplierForm(null); }}>
+          <div className="bg-[#111] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold">{editSupplierForm ? 'Edit Supplier' : 'New Supplier'}</h3>
+              <button onClick={() => { setShowSupplierModal(false); setEditSupplierForm(null); }} className="text-zinc-500 hover:text-white transition"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Supplier ID</label>
+                <input type="text" className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-emerald-500 font-mono disabled:opacity-50"
+                  disabled={!!editSupplierForm} placeholder="e.g. SUP-06" value={editSupplierForm ? editSupplierForm.id : supplierForm.id} 
+                  onChange={e => editSupplierForm ? setEditSupplierForm({...editSupplierForm, id: e.target.value}) : setSupplierForm({...supplierForm, id: e.target.value})} />
+              </div>
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Company Name</label>
+                <input type="text" className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  placeholder="e.g. Fresh Farms Ltd" value={editSupplierForm ? editSupplierForm.name : supplierForm.name} 
+                  onChange={e => editSupplierForm ? setEditSupplierForm({...editSupplierForm, name: e.target.value}) : setSupplierForm({...supplierForm, name: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Location</label>
+                  <input type="text" className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    placeholder="e.g. Naivasha" value={editSupplierForm ? editSupplierForm.location : supplierForm.location} 
+                    onChange={e => editSupplierForm ? setEditSupplierForm({...editSupplierForm, location: e.target.value}) : setSupplierForm({...supplierForm, location: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Category</label>
+                  <select 
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                    value={editSupplierForm ? editSupplierForm.cat : supplierForm.category}
+                    onChange={e => editSupplierForm ? setEditSupplierForm({...editSupplierForm, cat: e.target.value}) : setSupplierForm({...supplierForm, category: e.target.value})}
+                  >
+                    <option>Perishable</option>
+                    <option>Dry Store</option>
+                    <option>Cold Store</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Phone Number (SMS Ready)</label>
+                <input type="text" className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-emerald-500 font-mono"
+                  placeholder="+2547..." value={editSupplierForm ? editSupplierForm.phone : supplierForm.phone} 
+                  onChange={e => editSupplierForm ? setEditSupplierForm({...editSupplierForm, phone: e.target.value}) : setSupplierForm({...supplierForm, phone: e.target.value})} />
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => handleSaveSupplier(editSupplierForm ? 'edit' : 'create')} 
+              disabled={saving}
+              className="w-full mt-6 py-3 bg-white text-black font-bold rounded text-sm hover:bg-zinc-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'SAVING...' : (editSupplierForm ? 'SAVE CHANGES' : 'CREATE SUPPLIER')}
             </button>
           </div>
         </div>

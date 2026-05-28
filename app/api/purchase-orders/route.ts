@@ -119,3 +119,22 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const sql = getDb();
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'PO ID required' }, { status: 400 });
+    }
+
+    await sql`DELETE FROM purchase_orders WHERE id = ${id}`;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("DB Error deleting PO:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
