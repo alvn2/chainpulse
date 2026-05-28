@@ -1,4 +1,4 @@
-# ChainPulse HQ
+# ChainPulse
 
 **ChainPulse** is an enterprise-grade Supply Chain Management System designed specifically for cold-chain logistics, warehouse inventory control, and real-time fleet telematics. Built to operate in low-bandwidth environments, ChainPulse natively integrates with **Africa's Talking SMS API** to allow warehouse workers, suppliers, and drivers to interact with the central database using standard feature phones.
 
