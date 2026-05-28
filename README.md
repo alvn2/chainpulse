@@ -1,11 +1,41 @@
-<div align="center">
+# ChainPulse - Supply Chain Visibility System
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+A Next.js 14 specialized dashboard tracking cold chain conditions and inventory management leveraging the Africa's Talking SMS API. Built for scale.
 
-  <h1>Built with AI Studio</h2>
+## Overview
+This platform acts as an operation center.
+- **Top Dashboard:** Presents status matrices and active logistics metrics in real-time.
+- **SMS Integration:** Warehouse & delivery staff can update core system records purely via SMS bridging to the backend through Africa's Talking.
+- **Supabase Backbone:** Employs Supabase for robust persistent datastore constructs.
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## Core Setup Instructions
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+1. **Install Dependencies**
+   Run the package setup:
+   ```bash
+   npm install
+   ```
 
-</div>
+2. **Environment Configuration**
+   Copy the provided `.env.example` to `.env` and fill the variables.
+   - `AT_API_KEY`: Africa's Talking API key.
+   - `AT_USERNAME`: Your Africa's talking username (or 'sandbox').
+   - `AT_SENDER_ID`: Registered alphnumeric Sender ID (if used).
+   - `SUPABASE_URL` / `SUPABASE_ANON_KEY`: Credentials for DB integration.
+
+3. **Setup Database**
+   Log into your Supabase Dashboard, use `schema.sql` to generate the system tables and `seed.sql` to populate test metrics.
+
+4. **Boot Development Server**
+   ```bash
+   npm run dev
+   ```
+
+## API Documentation
+
+- `POST /api/at/inbound`: Receives inbound webhook calls from Africa's Talking and processes logic based on simple custom shortcodes (e.g., `TEMP`, `STOCK`).
+- `GET /api/shipments`: Yields active transportation entities for rendering.
+- `GET /api/alerts`: Exposes breach notifications or delayed shipping incidents.
+- `GET /api/inventory`: Surfaces SKU allocations array and reorder requirements. 
+
+Refer to `/sms-guide` path internally for specific driver operational codes.

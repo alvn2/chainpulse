@@ -1,0 +1,6 @@
+{
+  "name": "ChainPulse Logistics",
+  "description": "Supply Chain Visibility & Inventory Management system for a Kenyan fresh produce company",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
