@@ -114,8 +114,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
             <div className="text-xs font-mono text-zinc-500 uppercase flex items-center justify-end gap-2">
-               <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-pulse"></span>
-               System Nominal
+               ChainPulse HQ
             </div>
           </div>
 
@@ -196,11 +195,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Footer */}
       <footer className="h-8 shrink-0 border-t border-[#222222] bg-[#0a0a0a] px-4 flex items-center justify-between text-[10px] text-zinc-600 font-mono">
         <div className="flex gap-4 items-center">
-          <span className="flex items-center gap-1 text-emerald-500/70">
-            <span className="w-1.5 h-1.5 bg-[#10b981] rounded-full animate-pulse"></span> SYSTEM: ONLINE
-          </span>
-          <span className="flex items-center gap-1 text-zinc-500 hidden sm:flex">
-            NEON DB CONNECTED
+          <span className="text-zinc-500 hidden sm:flex">
+            Internal Operations
           </span>
         </div>
         <div className="flex gap-4">

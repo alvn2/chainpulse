@@ -26,18 +26,13 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-4 relative z-10 max-w-5xl mx-auto pt-20 pb-32">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#111] border border-[#333] text-xs font-mono text-zinc-400 mb-8">
-          <span className="w-2 h-2 bg-[#10b981] rounded-full animate-pulse"></span>
-          Now connected to Neon PostgreSQL
-        </div>
-        
         <h1 className="text-5xl sm:text-7xl font-bold tracking-tight mb-8 leading-[1.1]">
-          Modern Supply Chain <br/> 
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#10b981] to-emerald-300">Visibility Engine.</span>
+          Supply Chain <br/> 
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#10b981] to-emerald-300">Management System.</span>
         </h1>
         
         <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Internal operations portal for real-time cold chain monitoring, SMS-driven logistics, and warehouse inventory management.
+          Internal operations portal for real-time cold chain monitoring, logistics tracking, and warehouse inventory control.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
