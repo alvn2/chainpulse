@@ -1,22 +1,29 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Warehouse as WarehouseIcon, Snowflake, Map, ListChecks } from 'lucide-react';
+import { Warehouse as WarehouseIcon, Snowflake, Map, ListChecks, ArrowRightLeft } from 'lucide-react';
 
 type Zone = { id: string; name: string; temp: string; capacity: number; current: number; type: string; reading: number | null };
 type ReceivingLog = { id: string; worker: string; sku_id: string; sku_name: string; quantity: number; sms_text: string; timestamp: string };
+type Sku = { id: string; name: string; warehouse_zone: string };
 
 export default function WarehousePage() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [logs, setLogs] = useState<ReceivingLog[]>([]);
+  const [skus, setSkus] = useState<Sku[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Transfer State
+  const [transferForm, setTransferForm] = useState({ sku_id: '', new_zone: '' });
+  const [transferring, setTransferring] = useState(false);
 
   async function fetchData() {
     try {
       const res = await fetch('/api/warehouse');
       const data = await res.json();
-      setZones(data.zones);
-      setLogs(data.receivingLogs);
+      setZones(data.zones || []);
+      setLogs(data.receivingLogs || []);
+      setSkus(data.skus || []);
     } catch (err) {
       console.error('Failed to fetch warehouse data:', err);
     } finally {
@@ -25,6 +32,36 @@ export default function WarehousePage() {
   }
 
   useEffect(() => { fetchData(); }, []);
+
+  async function handleTransfer(e: React.FormEvent) {
+    e.preventDefault();
+    if (!transferForm.sku_id || !transferForm.new_zone) return;
+    
+    setTransferring(true);
+    try {
+      const res = await fetch('/api/warehouse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'transfer',
+          sku_id: transferForm.sku_id,
+          new_zone: transferForm.new_zone,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Stock transferred successfully.');
+        setTransferForm({ sku_id: '', new_zone: '' });
+        fetchData();
+      } else {
+        alert(data.error);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTransferring(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -75,7 +112,7 @@ export default function WarehousePage() {
                    </div>
                    <div className="h-2 w-full bg-black border border-[#333] rounded overflow-hidden">
                      <div 
-                       className={`h-full ${usage > 85 ? 'bg-amber-500' : 'bg-[#10b981]'}`} 
+                       className={`h-full transition-all duration-500 ${usage > 85 ? 'bg-amber-500' : 'bg-[#10b981]'}`} 
                        style={{ width: `${usage}%` }}
                      ></div>
                    </div>
@@ -102,14 +139,15 @@ export default function WarehousePage() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 flex-1 min-h-[400px]">
+         {/* Operations Logs */}
          <div className="bg-[#111] border border-[#222] rounded-lg p-5 flex flex-col">
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2 mb-4 pb-3 border-b border-[#222]">
-              <ListChecks className="w-4 h-4 text-emerald-500" /> Recent Goods Receiving (SMS Log)
+              <ListChecks className="w-4 h-4 text-emerald-500" /> Recent Operations Logs
             </h3>
             <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                {logs.map((log) => (
                  <div key={log.id} className="flex gap-3 text-sm border border-[#222] p-3 rounded-lg bg-[#0d0d0d] hover:bg-[#161616] transition cursor-pointer">
-                   <div className="w-1 bg-[#10b981] rounded-full shrink-0"></div>
+                   <div className={`w-1 rounded-full shrink-0 ${log.id.startsWith('TRF') ? 'bg-blue-500' : 'bg-[#10b981]'}`}></div>
                    <div className="flex-1 py-1">
                      <div className="flex justify-between items-center mb-1">
                        <span className="font-mono font-bold text-zinc-300">{log.id}</span>
@@ -118,27 +156,74 @@ export default function WarehousePage() {
                        </span>
                      </div>
                      <div className="text-zinc-400 text-xs">
-                       Worker <span className="text-white">&apos;{log.worker}&apos;</span> received{' '}
-                       <span className="font-mono text-emerald-400">{log.quantity}</span> units of{' '}
+                       Worker <span className="text-white">&apos;{log.worker}&apos;</span> handled{' '}
+                       <span className={`font-mono ${log.id.startsWith('TRF') ? 'text-blue-400' : 'text-emerald-400'}`}>{log.quantity}</span> units of{' '}
                        <span className="font-mono text-zinc-300">{log.sku_id}</span>
                      </div>
                      <div className="text-[10px] text-zinc-500 font-mono mt-2 pt-2 border-t border-[#222] flex items-center gap-2">
-                       <span className="uppercase tracking-widest">Origin SMS:</span>
+                       <span className="uppercase tracking-widest">Detail:</span>
                        <span className="text-zinc-300">&quot;{log.sms_text}&quot;</span>
                      </div>
                    </div>
                  </div>
                ))}
-               {logs.length === 0 && <div className="text-xs text-zinc-500 p-4 text-center">No receiving logs yet.</div>}
+               {logs.length === 0 && <div className="text-xs text-zinc-500 p-4 text-center">No operations logs yet.</div>}
             </div>
          </div>
+
+         {/* Internal Stock Transfer */}
          <div className="bg-[#111] border border-[#222] rounded-lg p-5 flex flex-col">
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2 mb-4 pb-3 border-b border-[#222]">
-              <Map className="w-4 h-4 text-blue-500" /> Dispatch Bay Schedule
+              <ArrowRightLeft className="w-4 h-4 text-blue-500" /> Internal Stock Transfer
             </h3>
-            <div className="flex-1 flex flex-col items-center justify-center bg-[#0a0a0a] border border-dashed border-[#333] rounded-lg">
-               <Map className="w-12 h-12 text-zinc-800 mb-4" />
-               <span className="text-zinc-600 font-mono text-[10px] uppercase tracking-widest">Interactive Floorplan • Coming Soon</span>
+            <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
+               <p className="text-sm text-zinc-400 mb-6 text-center">Reallocate stock between storage zones to optimize capacity and climate requirements.</p>
+               
+               <form onSubmit={handleTransfer} className="space-y-4 bg-[#0a0a0a] p-4 rounded-xl border border-[#222]">
+                 <div>
+                   <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block mb-1">Select SKU</label>
+                   <select 
+                     required
+                     value={transferForm.sku_id}
+                     onChange={e => setTransferForm({...transferForm, sku_id: e.target.value})}
+                     className="w-full bg-[#111] border border-[#333] rounded px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                   >
+                     <option value="">Choose item to transfer...</option>
+                     {skus.map(s => (
+                       <option key={s.id} value={s.id}>{s.name} ({s.id}) — Currently in {s.warehouse_zone}</option>
+                     ))}
+                   </select>
+                 </div>
+                 
+                 <div className="flex justify-center -my-2 relative z-10">
+                   <div className="bg-[#222] p-1 rounded-full border border-[#333]">
+                     <ArrowRightLeft className="w-4 h-4 text-zinc-400 rotate-90" />
+                   </div>
+                 </div>
+
+                 <div>
+                   <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block mb-1">Target Zone</label>
+                   <select 
+                     required
+                     value={transferForm.new_zone}
+                     onChange={e => setTransferForm({...transferForm, new_zone: e.target.value})}
+                     className="w-full bg-[#111] border border-[#333] rounded px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                   >
+                     <option value="">Destination zone...</option>
+                     {zones.map(z => (
+                       <option key={z.id} value={z.id}>{z.name} ({z.id})</option>
+                     ))}
+                   </select>
+                 </div>
+
+                 <button 
+                   type="submit"
+                   disabled={transferring || !transferForm.sku_id || !transferForm.new_zone}
+                   className="w-full mt-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-sm transition-colors disabled:opacity-50"
+                 >
+                   {transferring ? 'TRANSFERRING...' : 'EXECUTE TRANSFER'}
+                 </button>
+               </form>
             </div>
          </div>
       </div>

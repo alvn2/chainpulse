@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Users, Phone, Star, FileText, Plus, X } from 'lucide-react';
+import { Users, Phone, Star, FileText, Plus, X, CheckCircle } from 'lucide-react';
 
 type Supplier = { id: string; name: string; location: string; cat: string; phone: string; score: number; activePOs: number };
 type PO = { id: string; supplier_id: string; supplier_name: string; items: string; item_detail: string; total: number; status: string; expected: string; created_at: string };
@@ -13,6 +13,7 @@ export default function SuppliersPage() {
   const [showPOModal, setShowPOModal] = useState(false);
   const [poForm, setPOForm] = useState({ supplier_id: '', items: '', item_detail: '', total: '' });
   const [saving, setSaving] = useState(false);
+  const [receivingId, setReceivingId] = useState<string | null>(null);
 
   async function fetchData() {
     try {
@@ -48,6 +49,28 @@ export default function SuppliersPage() {
       console.error('Failed to create PO:', err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleReceivePO(poId: string) {
+    setReceivingId(poId);
+    try {
+      const res = await fetch('/api/purchase-orders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: poId, action: 'receive' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`PO Received! Automatically added ${data.received} units of ${data.sku} to stock.`);
+        fetchData();
+      } else {
+        alert(`Failed to receive: ${data.error}`);
+      }
+    } catch (err) {
+      console.error('Failed to receive PO:', err);
+    } finally {
+      setReceivingId(null);
     }
   }
 
@@ -145,12 +168,12 @@ export default function SuppliersPage() {
                   <th className="p-4 font-normal">Items</th>
                   <th className="p-4 font-normal text-right">Total (KES)</th>
                   <th className="p-4 font-normal text-center">Status</th>
-                  <th className="p-4 font-normal text-right">Expected</th>
+                  <th className="p-4 font-normal text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#222] font-mono text-xs">
                  {pos.map(po => (
-                   <tr key={po.id} className="hover:bg-[#1a1a1a] transition-colors cursor-pointer">
+                   <tr key={po.id} className="hover:bg-[#1a1a1a] transition-colors cursor-pointer group">
                       <td className="p-4 font-bold text-amber-500">{po.id}</td>
                       <td className="p-4 text-white font-sans text-sm">{po.supplier_name}</td>
                       <td className="p-4 text-zinc-400">{po.items} <span className="text-zinc-600">({po.item_detail})</span></td>
@@ -158,7 +181,19 @@ export default function SuppliersPage() {
                       <td className="p-4 text-center">
                          <span className={`${poStatusColors[po.status] || ''} border px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-widest`}>{po.status}</span>
                       </td>
-                      <td className="p-4 text-right text-zinc-500">{po.expected}</td>
+                      <td className="p-4 text-center">
+                         {po.status !== 'RECEIVED' ? (
+                           <button 
+                             onClick={(e) => { e.stopPropagation(); handleReceivePO(po.id); }}
+                             disabled={receivingId === po.id}
+                             className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/50 hover:bg-emerald-500/20 hover:border-emerald-500 rounded flex items-center justify-center gap-1 mx-auto transition-colors disabled:opacity-50"
+                           >
+                             <CheckCircle className="w-3 h-3" /> {receivingId === po.id ? '...' : 'RECEIVE'}
+                           </button>
+                         ) : (
+                           <span className="text-zinc-600 text-[10px]">VERIFIED</span>
+                         )}
+                      </td>
                    </tr>
                  ))}
                  {pos.length === 0 && (
@@ -191,14 +226,14 @@ export default function SuppliersPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">SKU / Items</label>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">SKU ID</label>
                 <input type="text" className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-amber-500 font-mono"
                   placeholder="e.g. SKU-RS-NV" value={poForm.items} onChange={e => setPOForm({...poForm, items: e.target.value})} />
               </div>
               <div>
                 <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Quantity Detail</label>
                 <input type="text" className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-amber-500 font-mono"
-                  placeholder="e.g. 2000 stems" value={poForm.item_detail} onChange={e => setPOForm({...poForm, item_detail: e.target.value})} />
+                  placeholder="e.g. 2000 pcs" value={poForm.item_detail} onChange={e => setPOForm({...poForm, item_detail: e.target.value})} />
               </div>
               <div>
                 <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Total (KES)</label>

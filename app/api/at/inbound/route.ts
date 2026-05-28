@@ -17,6 +17,10 @@ export async function POST(req: NextRequest) {
     }
 
     const sql = getDb();
+    
+    // Log inbound message
+    await sql`INSERT INTO sms_messages (sender, message, direction) VALUES (${sender || 'Unknown'}, ${message}, 'INBOUND')`;
+
     const parts = message.trim().split(' ');
     const command = parts[0]?.toUpperCase();
 
@@ -136,6 +140,9 @@ export async function POST(req: NextRequest) {
           );
           console.log(`[AT SMS Sent] Alert: ${alertMsg}`);
         }
+        
+        // Log outbound message to DB (even if API key is missing for demo purposes)
+        await sql`INSERT INTO sms_messages (sender, message, direction) VALUES ('System', ${alertMsg}, 'OUTBOUND')`;
       } catch (err) {
         console.error('Failed to send outbound SMS', err);
       }

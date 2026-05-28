@@ -1,14 +1,36 @@
 "use client";
 
-import React, { useState } from 'react';
-import { ArrowLeft, MessageSquareDot, Smartphone, Send, Terminal, Link as LinkIcon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, MessageSquareDot, Smartphone, Send, Terminal, Link as LinkIcon, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+
+type SmsMessage = { id: number; sender: string; message: string; direction: string; created_at: string };
 
 export default function SMSGuidePage() {
   const [phone, setPhone] = useState('+254700000000');
   const [message, setMessage] = useState('');
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
+  const [inbox, setInbox] = useState<SmsMessage[]>([]);
+  const [inboxLoading, setInboxLoading] = useState(true);
+
+  async function fetchInbox() {
+    try {
+      const res = await fetch('/api/sms');
+      const data = await res.json();
+      setInbox(data);
+    } catch (err) {
+      console.error('Failed to fetch SMS inbox', err);
+    } finally {
+      setInboxLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchInbox();
+    const timer = setInterval(fetchInbox, 5000); // Poll every 5 seconds for new SMS
+    return () => clearInterval(timer);
+  }, []);
 
   async function handleSimulate(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +53,9 @@ export default function SMSGuidePage() {
       });
       
       const text = await res.text();
-      setResponse(`Status: ${res.status}\nResponse: ${text || 'OK (No content returned, check DB/Alerts)'}`);
+      setResponse(`Status: ${res.status}\nResponse: ${text || 'OK'}`);
+      setMessage('');
+      fetchInbox(); // instantly refresh
     } catch (err: any) {
       setResponse(`Error: ${err.message}`);
     } finally {
@@ -40,15 +64,15 @@ export default function SMSGuidePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 p-6 md:p-12 font-sans selection:bg-[#10b981] selection:text-white overflow-y-auto custom-scrollbar">
-      <div className="max-w-4xl mx-auto">
-        <header className="mb-8 flex items-center justify-between">
+    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 p-6 md:p-12 font-sans selection:bg-[#10b981] selection:text-white overflow-y-auto custom-scrollbar flex flex-col">
+      <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col">
+        <header className="mb-8 flex items-center justify-between shrink-0">
           <div>
             <div className="flex items-center space-x-3 mb-2">
-              <Smartphone className="w-8 h-8 text-[#10b981]" />
-              <h1 className="text-3xl font-bold tracking-tight">SMS Operations Guide</h1>
+              <MessageSquareDot className="w-8 h-8 text-[#10b981]" />
+              <h1 className="text-3xl font-bold tracking-tight">Live SMS Inbox & Simulator</h1>
             </div>
-            <p className="text-gray-400">Warehouse & Driver AT SMS Integration Guide</p>
+            <p className="text-gray-400">View live messages from Africa&apos;s Talking and simulate texts from the field.</p>
           </div>
           <Link href="/dashboard" className="flex items-center text-sm text-gray-400 hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -56,63 +80,86 @@ export default function SMSGuidePage() {
           </Link>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Guide Section */}
-          <section className="bg-[#111111] border border-[#222222] rounded-xl p-6 shadow-xl flex flex-col h-full">
-            <div className="mb-6 pb-6 border-b border-[#222222]">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <MessageSquareDot className="w-5 h-5 mr-3 text-blue-400" />
-                How it works
-              </h2>
-              <p className="text-sm text-gray-400 leading-relaxed">
-                Field workers (drivers, warehouse operators) text these shortcodes to our Africa&apos;s Talking (AT) phone number. 
-                The system processes the text, logs data into Neon PostgreSQL, and triggers realtime alerts.
-              </p>
-            </div>
-
-            <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2">
-              <CommandCard 
-                cmd="TEMP [value] [batchId]" 
-                desc="Log a temperature reading for a specific shipment."
-                example="TEMP 4.5 SHP-101"
-              />
-              <CommandCard 
-                cmd="STOCK [qty] [skuId]" 
-                desc="Set absolute stock level for a SKU."
-                example="STOCK 450 SKU-RS-NV"
-              />
-              <CommandCard 
-                cmd="RECV [qty] [skuId]" 
-                desc="Add received inbound inventory to stock."
-                example="RECV 50 SKU-RS-NV"
-              />
-              <CommandCard 
-                cmd="STATUS DELIVER [shipmentId]" 
-                desc="Update shipment delivery status."
-                example="STATUS DELIVER SHP-101"
-              />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1 min-h-0">
+          
+          {/* SMS Inbox (Left Col) */}
+          <section className="bg-[#111111] border border-[#222222] rounded-xl flex flex-col shadow-xl overflow-hidden min-h-[500px]">
+             <div className="p-4 border-b border-[#222] bg-[#161616] flex justify-between items-center shrink-0">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 flex items-center">
+                  <Smartphone className="w-4 h-4 mr-2 text-emerald-500" /> Live Feed
+                </h2>
+                <div className="flex items-center gap-3">
+                  <button onClick={fetchInbox} className="text-zinc-500 hover:text-white transition-colors">
+                     <RefreshCw className="w-4 h-4" />
+                  </button>
+                  <span className="text-[10px] font-mono text-zinc-600 bg-black px-2 py-0.5 rounded">{inbox.length} msgs</span>
+                </div>
+             </div>
+             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] bg-black/20">
+                {inboxLoading ? (
+                  <div className="text-zinc-500 text-sm text-center">Loading messages...</div>
+                ) : inbox.length === 0 ? (
+                  <div className="text-zinc-500 text-sm text-center h-full flex items-center justify-center">No messages yet. Send a simulated SMS to see it here!</div>
+                ) : (
+                  inbox.map(msg => {
+                    const isInbound = msg.direction === 'INBOUND';
+                    return (
+                      <div key={msg.id} className={`flex flex-col max-w-[85%] ${isInbound ? 'self-start' : 'self-end items-end ml-auto'}`}>
+                        <div className="text-[10px] text-zinc-500 font-mono mb-1 flex items-center gap-2">
+                          <span>{msg.sender}</span>
+                          <span>•</span>
+                          <span>{new Date(msg.created_at).toLocaleTimeString()}</span>
+                        </div>
+                        <div className={`p-3 rounded-2xl text-sm ${
+                          isInbound 
+                            ? 'bg-[#1a1a1a] border border-[#333] text-zinc-300 rounded-tl-none' 
+                            : 'bg-emerald-950/40 border border-emerald-900/50 text-emerald-100 rounded-tr-none'
+                        }`}>
+                          {msg.message}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+             </div>
           </section>
 
-          {/* Simulator & Ngrok Section */}
-          <div className="flex flex-col gap-8 h-full">
+          {/* Simulator & Ngrok Section (Right Col) */}
+          <div className="flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 h-full">
+            
             {/* Live Simulator */}
-            <section className="bg-[#111111] border border-[#222222] rounded-xl p-6 shadow-xl">
+            <section className="bg-[#111111] border border-[#222222] rounded-xl p-6 shadow-xl shrink-0">
                <h2 className="text-xl font-semibold mb-4 flex items-center">
                   <Terminal className="w-5 h-5 mr-3 text-emerald-500" />
-                  Live Simulator
+                  Simulator
                </h2>
-               <p className="text-sm text-gray-400 mb-6">Test the webhook directly without a phone. This will update the real database.</p>
+               <p className="text-sm text-gray-400 mb-6">Test commands directly. These will appear in the inbox and update the database.</p>
                
                <form onSubmit={handleSimulate} className="space-y-4">
-                  <div>
-                    <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Sender Phone</label>
-                    <input 
-                      type="text" 
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Sender Phone</label>
+                      <input 
+                        type="text" 
+                        value={phone}
+                        onChange={e => setPhone(e.target.value)}
+                        className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Quick Fill</label>
+                      <select 
+                        onChange={e => setMessage(e.target.value)}
+                        className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono text-zinc-400"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Select example...</option>
+                        <option value="TEMP 4.5 SHP-101">TEMP 4.5 SHP-101</option>
+                        <option value="TEMP 12 SHP-101">TEMP 12 SHP-101 (Breach)</option>
+                        <option value="RECV 50 SKU-RS-NV">RECV 50 SKU-RS-NV</option>
+                        <option value="STATUS DELIVER SHP-101">STATUS DELIVER SHP-101</option>
+                      </select>
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">SMS Message</label>
@@ -132,51 +179,44 @@ export default function SMSGuidePage() {
                     <Send className="w-4 h-4" /> {loading ? 'Sending...' : 'Send Simulated SMS'}
                   </button>
                </form>
-               
-               {response && (
-                 <div className="mt-4 p-3 bg-black border border-[#333] rounded-lg">
-                   <div className="text-[10px] font-mono uppercase text-zinc-500 mb-1">Response</div>
-                   <pre className="text-xs font-mono text-emerald-400 whitespace-pre-wrap">{response}</pre>
-                 </div>
-               )}
             </section>
 
-            {/* Ngrok Instructions */}
-            <section className="bg-blue-950/20 border border-blue-900/50 rounded-xl p-6 shadow-xl flex-1">
-               <h2 className="text-xl font-semibold mb-4 flex items-center text-blue-400">
-                  <LinkIcon className="w-5 h-5 mr-3" />
-                  Connecting Africa&apos;s Talking
+            {/* Commands Reference */}
+            <section className="bg-[#111111] border border-[#222222] rounded-xl p-6 shadow-xl shrink-0">
+               <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4 pb-2 border-b border-[#222]">
+                  Command Reference
                </h2>
-               <p className="text-sm text-gray-300 mb-4">
-                 For AT to reach your local environment during the hackathon, you must expose your localhost using <code className="bg-black px-1 rounded text-emerald-400">ngrok</code>.
-               </p>
-               <ol className="list-decimal pl-4 text-sm text-gray-400 space-y-2 mb-4">
-                 <li>Run <code className="bg-black px-1 rounded text-white">ngrok http 3000</code> (or 3001) in your terminal.</li>
-                 <li>Copy the generated Forwarding URL (e.g., <code className="text-blue-300">https://xyz.ngrok-free.app</code>).</li>
-                 <li>Go to the Africa&apos;s Talking Dashboard -> SMS -> SMS Callback URLs.</li>
-                 <li>Set the Inbound URL to: <code className="bg-black p-1 rounded block mt-1 text-white text-xs break-all">https://xyz.ngrok-free.app/api/at/inbound</code></li>
-               </ol>
+               <div className="space-y-3">
+                 <CommandCard cmd="TEMP [val] [shpId]" desc="Log temp. (>8° triggers breach alert)" />
+                 <CommandCard cmd="STOCK [qty] [skuId]" desc="Set absolute stock quantity." />
+                 <CommandCard cmd="RECV [qty] [skuId]" desc="Add inbound inventory to stock." />
+                 <CommandCard cmd="STATUS DELIVER [shpId]" desc="Mark shipment delivered." />
+               </div>
             </section>
+            
+            {/* Ngrok Instructions */}
+            <section className="bg-blue-950/20 border border-blue-900/50 rounded-xl p-6 shadow-xl shrink-0">
+               <h2 className="text-sm font-bold uppercase tracking-widest text-blue-400 mb-2 flex items-center">
+                  <LinkIcon className="w-4 h-4 mr-2" />
+                  Live Phone Testing
+               </h2>
+               <p className="text-xs text-gray-300 mb-3">
+                 To test with a real phone via AT sandbox during the hackathon, run <code className="bg-black px-1 text-emerald-400">ngrok http 3000</code> and set your AT Webhook URL to <code className="bg-black px-1 text-blue-300">https://xyz.ngrok.../api/at/inbound</code>.
+               </p>
+            </section>
+
           </div>
         </div>
-
-        <footer className="text-center text-xs text-gray-500 pb-8">
-          Powered by Next.js, Neon DB & Africa&apos;s Talking.
-        </footer>
       </div>
     </div>
   );
 }
 
-function CommandCard({ cmd, desc, example }: { cmd: string, desc: string, example: string }) {
+function CommandCard({ cmd, desc }: { cmd: string, desc: string }) {
   return (
-    <div className="p-4 rounded-lg bg-black/50 border border-[#222] hover:border-[#333] transition-colors">
-      <h3 className="text-lg font-mono text-[#10b981] mb-2">{cmd}</h3>
-      <p className="text-sm text-gray-300 mb-3">{desc}</p>
-      <div className="p-3 bg-[#111111] rounded border border-[#2a2a2a]">
-        <span className="text-gray-500 uppercase font-semibold tracking-wider text-[10px] block mb-1">Example Text</span>
-        <span className="font-mono text-gray-200">{example}</span>
-      </div>
+    <div className="flex justify-between items-center text-xs">
+      <span className="font-mono text-[#10b981] bg-[#0a0a0a] px-2 py-1 rounded border border-[#333] whitespace-nowrap mr-3">{cmd}</span>
+      <span className="text-zinc-400 text-right">{desc}</span>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Smartphone, Send } from 'lucide-react';
 
 type Shipment = { id: string; batch: string; origin: string; destination: string; driver: string; temp: number; status: string; lastUpdate: string };
 type Alert = { id: number; type: string; message: string; severity: 'red' | 'amber' | 'emerald' | 'blue' | 'green'; timestamp: string };
@@ -14,6 +14,10 @@ export default function DashboardPage() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // SMS Simulator State
+  const [smsMsg, setSmsMsg] = useState('');
+  const [smsSending, setSmsSending] = useState(false);
 
   async function fetchData() {
     try {
@@ -47,6 +51,29 @@ export default function DashboardPage() {
       clearInterval(dataTimer);
     };
   }, []);
+
+  async function handleSimulateSms(e: React.FormEvent) {
+    e.preventDefault();
+    if (!smsMsg) return;
+    setSmsSending(true);
+    try {
+      const payload = new URLSearchParams();
+      payload.append('from', '+254700000000');
+      payload.append('text', smsMsg);
+      await fetch('/api/at/inbound', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload.toString()
+      });
+      setSmsMsg('');
+      // Instantly refresh dashboard to show new data/alerts
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSmsSending(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -100,7 +127,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-[400px]">
-        {/* Left Col - Shipments */}
+        {/* Left Col - Shipments & SMS */}
         <div className="lg:col-span-2 flex flex-col gap-4">
           <div className="flex-1 bg-[#111111] border border-[#222222] rounded-lg flex flex-col overflow-hidden min-h-[250px]">
              <div className="p-3 border-b border-[#222222] flex justify-between items-center shrink-0">
@@ -154,18 +181,32 @@ export default function DashboardPage() {
             </div>
           </div>
           
-          <div className="h-[200px] shrink-0 bg-[#111111] border border-[#222222] rounded-lg relative overflow-hidden flex flex-col">
-            <div className="absolute top-3 left-3 z-10 bg-black/80 p-2 rounded border border-[#222222] flex items-center gap-2">
-              <span className="w-2 h-2 bg-[#10b981] rounded-full animate-pulse"></span>
-              <span className="text-[10px] font-mono font-bold tracking-widest text-zinc-400">TELEMATICS ENGINE</span>
-            </div>
-            <div className="flex-1 w-full h-full opacity-40 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] relative">
-               <div className="absolute w-full h-px bg-zinc-800 top-1/2"></div>
-               <div className="absolute h-full w-px bg-zinc-800 left-1/3"></div>
-               <div className="absolute top-1/4 left-1/4 flex flex-col items-center">
-                  <svg className="w-6 h-6 text-[#10b981] mb-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/></svg>
-               </div>
-            </div>
+          {/* SMS Simulator Widget replacing placeholder */}
+          <div className="h-[200px] shrink-0 bg-[#111111] border border-[#222222] rounded-lg relative overflow-hidden flex flex-col p-4">
+             <div className="flex justify-between items-center mb-4 border-b border-[#222] pb-2">
+                <div className="flex items-center gap-2">
+                   <Smartphone className="w-5 h-5 text-emerald-500" />
+                   <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-500">Live SMS Simulator</h2>
+                </div>
+                <Link href="/sms-guide" className="text-[10px] font-mono text-zinc-500 hover:text-white transition">VIEW COMMANDS →</Link>
+             </div>
+             <p className="text-xs text-zinc-400 mb-4">Demo the Africa's Talking webhook instantly. Try sending: <code className="text-emerald-400 bg-black px-1 rounded">TEMP 12 SHP-1001</code></p>
+             <form onSubmit={handleSimulateSms} className="flex gap-2 mt-auto">
+               <input 
+                 type="text" 
+                 value={smsMsg}
+                 onChange={e => setSmsMsg(e.target.value)}
+                 placeholder="Enter SMS command..."
+                 className="flex-1 bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono uppercase"
+               />
+               <button 
+                 type="submit"
+                 disabled={smsSending || !smsMsg}
+                 className="px-4 py-2 bg-[#10b981] text-black font-bold rounded text-sm hover:bg-emerald-400 transition disabled:opacity-50 flex items-center gap-2"
+               >
+                 <Send className="w-4 h-4" /> Send
+               </button>
+             </form>
           </div>
         </div>
 

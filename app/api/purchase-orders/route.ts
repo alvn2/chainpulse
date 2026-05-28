@@ -42,3 +42,51 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    const sql = getDb();
+    const body = await req.json();
+    const { id, action } = body;
+
+    if (action === 'receive' && id) {
+      // 1. Get the PO
+      const [po] = await sql`SELECT * FROM purchase_orders WHERE id = ${id}`;
+      if (!po || po.status === 'RECEIVED') {
+        return NextResponse.json({ error: 'PO not found or already received' }, { status: 400 });
+      }
+
+      // 2. Mark PO as RECEIVED
+      await sql`UPDATE purchase_orders SET status = 'RECEIVED' WHERE id = ${id}`;
+
+      // 3. Try to increase stock if 'items' maps to a valid SKU ID.
+      // We extract a number from item_detail (e.g., "100 pcs" -> 100).
+      // Fallback to 0 if parsing fails, but realistically we expect numbers.
+      const match = po.item_detail.match(/(\d+)/);
+      const qtyToAdd = match ? parseInt(match[1], 10) : 100; // default 100 if couldn't parse
+      const skuId = po.items; // When POs are generated, 'items' usually holds the SKU ID
+
+      const [stockExists] = await sql`SELECT quantity FROM stock_levels WHERE sku_id = ${skuId}`;
+      if (stockExists) {
+        await sql`
+          UPDATE stock_levels 
+          SET quantity = quantity + ${qtyToAdd}, last_updated = NOW() 
+          WHERE sku_id = ${skuId}
+        `;
+        
+        const logId = `RCV-${Date.now().toString().slice(-6)}`;
+        await sql`
+          INSERT INTO receiving_logs (id, worker, sku_id, quantity, sms_text)
+          VALUES (${logId}, 'System (PO Received)', ${skuId}, ${qtyToAdd}, 'Automated Receiving from PO')
+        `;
+      }
+
+      return NextResponse.json({ success: true, received: qtyToAdd, sku: skuId });
+    }
+
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error: any) {
+    console.error("DB Error updating PO:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

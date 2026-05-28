@@ -2,6 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Truck, MapPin, Search, Calendar, X, Plus } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const ShipmentMap = dynamic(() => import('@/components/ShipmentMap'), { 
+  ssr: false,
+  loading: () => <div className="w-full h-full flex items-center justify-center bg-[#0a0a0a] text-zinc-500 font-mono text-xs">Loading Map Engine...</div>
+});
 
 type Shipment = { id: string; batch: string; origin: string; destination: string; driver: string; temp: number; status: string; lastUpdate: string; progress: number; eta: string };
 
@@ -169,11 +175,21 @@ export default function ShipmentsPage() {
               <span className="font-mono text-[10px] tracking-widest text-zinc-300">LIVE TELEMATICS</span>
             </div>
             
-             <div className="flex-1 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')] flex items-center justify-center pointer-events-none border-b border-[#222]">
-                 <div className="text-center">
-                    <MapPin className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
-                    <p className="text-zinc-400 font-mono uppercase tracking-widest text-sm">Map Engine • Coming Soon</p>
+             <div className="flex-1 border-b border-[#222] relative z-0">
+               {selectedShipment ? (
+                 <ShipmentMap 
+                   origin={selectedShipment.origin} 
+                   destination={selectedShipment.destination}
+                   progress={selectedShipment.progress}
+                   shipmentId={selectedShipment.id}
+                   status={selectedShipment.status}
+                 />
+               ) : (
+                 <div className="w-full h-full flex flex-col items-center justify-center bg-[#0a0a0a]">
+                    <MapPin className="w-12 h-12 text-zinc-500 mb-4" />
+                    <p className="text-zinc-400 font-mono uppercase tracking-widest text-sm">Select a shipment</p>
                  </div>
+               )}
              </div>
 
              {selectedShipment && (
