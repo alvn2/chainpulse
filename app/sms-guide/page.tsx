@@ -194,15 +194,28 @@ export default function SMSGuidePage() {
                </div>
             </section>
             
-            {/* Ngrok Instructions */}
-            <section className="bg-blue-950/20 border border-blue-900/50 rounded-xl p-6 shadow-xl shrink-0">
-               <h2 className="text-sm font-bold uppercase tracking-widest text-blue-400 mb-2 flex items-center">
-                  <LinkIcon className="w-4 h-4 mr-2" />
-                  Live Phone Testing
+            {/* Live Phone Testing Guide */}
+            <section className="bg-blue-950/30 border-2 border-blue-600 rounded-xl p-6 shadow-[0_0_20px_rgba(37,99,235,0.2)] shrink-0 relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500 rounded-full blur-[60px] opacity-20"></div>
+               <h2 className="text-sm font-bold uppercase tracking-widest text-blue-400 mb-4 flex items-center">
+                  <Smartphone className="w-4 h-4 mr-2" />
+                  How to send a LIVE SMS
                </h2>
-               <p className="text-xs text-gray-300 mb-3">
-                 To test with a real phone via AT sandbox during the hackathon, run <code className="bg-black px-1 text-emerald-400">ngrok http 3000</code> and set your AT Webhook URL to <code className="bg-black px-1 text-blue-300">https://xyz.ngrok.../api/at/inbound</code>.
+               
+               <p className="text-sm text-gray-300 mb-4 font-semibold text-white">
+                 To text this system from a real phone during the hackathon, you CANNOT use your standard SMS app (e.g. iMessage).
                </p>
+
+               <ol className="list-decimal pl-5 text-xs text-zinc-400 space-y-3 font-mono">
+                 <li><strong className="text-emerald-400 font-sans">Download the App:</strong> Get the <b>Africa's Talking Sandbox</b> app from the Google Play Store (Android only).</li>
+                 <li><strong className="text-emerald-400 font-sans">Expose Localhost:</strong> Run <code className="bg-black text-white px-1 rounded">ngrok http 3000</code> in your terminal.</li>
+                 <li><strong className="text-emerald-400 font-sans">Set Webhook:</strong> Go to the AT Dashboard -&gt; SMS -&gt; SMS Callback URLs. Paste your Ngrok URL: <code className="text-blue-300 bg-black px-1 rounded">https://xyz.ngrok.../api/at/inbound</code></li>
+                 <li><strong className="text-emerald-400 font-sans">Send the Text:</strong> Open the AT Sandbox App, use your registered shortcode (e.g., <code className="text-white bg-black px-1 rounded">22384</code>), and send a command like <code className="text-white bg-black px-1 rounded">TEMP 10 SHP-101</code>.</li>
+               </ol>
+
+               <div className="mt-5 p-3 bg-[#0a0a0a] border border-[#222] rounded text-[10px] text-zinc-500 font-mono text-center">
+                 The message will appear live in the inbox on the left!
+               </div>
             </section>
 
           </div>
