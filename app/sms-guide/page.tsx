@@ -193,6 +193,54 @@ export default function SMSGuidePage() {
                  <CommandCard cmd="STATUS DELIVER [shpId]" desc="Mark shipment delivered." />
                </div>
             </section>
+
+            {/* Test Real SMS Delivery */}
+            <section className="bg-emerald-950/20 border-2 border-emerald-900/50 rounded-xl p-6 shadow-xl shrink-0">
+               <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-400 mb-4 flex items-center">
+                  <Smartphone className="w-4 h-4 mr-2" />
+                  Test Live SMS Delivery
+               </h2>
+               <p className="text-xs text-zinc-400 mb-4">
+                 Send a real text message to your physical phone using your production Africa's Talking API key.
+               </p>
+               <form 
+                 className="flex flex-col gap-3"
+                 onSubmit={async (e) => {
+                   e.preventDefault();
+                   const form = e.target as HTMLFormElement;
+                   const btn = form.querySelector('button');
+                   if (btn) btn.disabled = true;
+                   
+                   try {
+                     const res = await fetch('/api/sms/test-send', {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify({
+                         phone: form.phone.value,
+                         text: 'ChainPulse: This is a live production SMS test!'
+                       })
+                     });
+                     const data = await res.json();
+                     alert(data.success ? 'Success! Check your phone.' : `Error: ${JSON.stringify(data.details)}`);
+                   } catch (err) {
+                     alert('Failed to trigger SMS');
+                   } finally {
+                     if (btn) btn.disabled = false;
+                   }
+                 }}
+               >
+                 <input 
+                   name="phone"
+                   type="text" 
+                   placeholder="+2547XXXXXXXX" 
+                   required
+                   className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-emerald-500 font-mono"
+                 />
+                 <button type="submit" className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-sm transition">
+                   Send Real Text To My Phone
+                 </button>
+               </form>
+            </section>
             
             {/* Live Phone Testing Guide */}
             <section className="bg-blue-950/30 border-2 border-blue-600 rounded-xl p-6 shadow-[0_0_20px_rgba(37,99,235,0.2)] shrink-0 relative overflow-hidden">
