@@ -265,6 +265,7 @@ export default function ShipmentsPage() {
                     required
                   />
                 </div>
+              ))}
                 <div>
                   <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Driver Name</label>
                   <input type="text" className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500 font-mono"
