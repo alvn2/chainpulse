@@ -23,8 +23,37 @@ export async function POST(req: Request) {
   try {
     const sql = getDb();
     const body = await req.json();
-    const { sku_id, quantity, mode } = body;
+    const { mode } = body;
 
+    if (mode === 'create_sku') {
+      const { sku_id, name, category, unit, threshold, zone } = body;
+      if (!sku_id || !name || !category || !unit || !threshold || !zone) {
+        return NextResponse.json({ error: 'All SKU fields required' }, { status: 400 });
+      }
+      
+      // Check if SKU exists
+      const [existing] = await sql`SELECT id FROM skus WHERE id = ${sku_id}`;
+      if (existing) {
+        return NextResponse.json({ error: 'SKU ID already exists' }, { status: 400 });
+      }
+
+      // Insert SKU
+      await sql`
+        INSERT INTO skus (id, name, category, unit, reorder_threshold, warehouse_zone)
+        VALUES (${sku_id}, ${name}, ${category}, ${unit}, ${threshold}, ${zone})
+      `;
+
+      // Insert initial stock level of 0
+      await sql`
+        INSERT INTO stock_levels (sku_id, quantity)
+        VALUES (${sku_id}, 0)
+      `;
+      
+      return NextResponse.json({ success: true, sku_id });
+    }
+
+    // Default modes: 'add' or 'set'
+    const { sku_id, quantity } = body;
     if (!sku_id || quantity === undefined) {
       return NextResponse.json({ error: 'sku_id and quantity required' }, { status: 400 });
     }

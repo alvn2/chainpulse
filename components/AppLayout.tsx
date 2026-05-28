@@ -24,8 +24,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [alerts, setAlerts] = useState<any[]>([]);
   const alertsRef = useRef<HTMLDivElement>(null);
 
+  const isAuthOrLanding = pathname === "/" || pathname === "/login" || pathname === "/signup";
+
   const navLinks = [
-    { name: "Dashboard", href: "/", icon: <LayoutDashboard className="w-4 h-4" /> },
+    { name: "Dashboard", href: "/dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
     { name: "Inventory", href: "/inventory", icon: <Box className="w-4 h-4" /> },
     { name: "Warehouse", href: "/warehouse", icon: <Warehouse className="w-4 h-4" /> },
     { name: "Shipments", href: "/shipments", icon: <Truck className="w-4 h-4" /> },
@@ -34,13 +36,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "SMS Guide", href: "/sms-guide", icon: <MessageSquare className="w-4 h-4" /> },
   ];
 
-  // Fetch alerts for the dropdown
+  // Fetch alerts for the dropdown (only if not on landing/auth pages)
   useEffect(() => {
+    if (isAuthOrLanding) return;
     fetch('/api/alerts')
       .then(res => res.json())
       .then(data => setAlerts(Array.isArray(data) ? data.slice(0, 5) : []))
       .catch(() => {});
-  }, []);
+  }, [isAuthOrLanding]);
 
   // Close alerts dropdown on outside click
   useEffect(() => {
@@ -60,6 +63,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const highAlerts = alerts.filter(a => a.severity === 'red').length;
 
+  if (isAuthOrLanding) {
+    return <div className="h-screen bg-[#0a0a0a] text-white overflow-hidden selection:bg-[#10b981] selection:text-white flex flex-col">{children}</div>;
+  }
+
   return (
     <div className="h-screen bg-[#0a0a0a] text-white flex flex-col font-sans selection:bg-[#10b981] selection:text-white overflow-hidden">
       {/* Header */}
@@ -73,7 +80,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-[#10b981] rounded flex items-center justify-center">
               <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -130,7 +137,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="absolute right-0 top-full mt-2 w-80 bg-[#111] border border-[#333] rounded-lg shadow-2xl z-50 overflow-hidden">
                 <div className="p-3 border-b border-[#222] flex justify-between items-center">
                   <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Recent Alerts</span>
-                  <Link href="/" className="text-[10px] text-blue-400 hover:text-blue-300 transition">View All</Link>
+                  <Link href="/dashboard" className="text-[10px] text-blue-400 hover:text-blue-300 transition">View All</Link>
                 </div>
                 <div className="max-h-64 overflow-y-auto custom-scrollbar">
                   {alerts.map(a => {

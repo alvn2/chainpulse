@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Download, TrendingDown, TrendingUp, AlertCircle, X } from 'lucide-react';
+import { Search, Plus, Download, TrendingDown, TrendingUp, AlertCircle, X, PackagePlus } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 type InventoryItem = { sku: string; name: string; category: string; unit: string; qty: number; threshold: number; warehouse_zone: string };
@@ -22,7 +22,11 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  
+  // Modal state
+  const [modalTab, setModalTab] = useState<'update' | 'create'>('update');
   const [addForm, setAddForm] = useState({ sku_id: '', quantity: '', mode: 'add' as 'add' | 'set' });
+  const [createForm, setCreateForm] = useState({ sku_id: '', name: '', category: 'Perishable', unit: 'pcs', threshold: '100', zone: 'ZONE-A' });
   const [saving, setSaving] = useState(false);
 
   async function fetchInventory() {
@@ -64,6 +68,39 @@ export default function InventoryPage() {
     }
   }
 
+  async function handleCreateSKU() {
+    if (!createForm.sku_id || !createForm.name) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'create_sku',
+          sku_id: createForm.sku_id.toUpperCase(),
+          name: createForm.name,
+          category: createForm.category,
+          unit: createForm.unit,
+          threshold: parseInt(createForm.threshold, 10),
+          zone: createForm.zone
+        }),
+      });
+      
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        setShowAddModal(false);
+        setCreateForm({ sku_id: '', name: '', category: 'Perishable', unit: 'pcs', threshold: '100', zone: 'ZONE-A' });
+        fetchInventory();
+      }
+    } catch (err) {
+      console.error('Failed to create SKU:', err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function exportCSV() {
     const headers = ['SKU', 'Product', 'Category', 'Quantity', 'Unit', 'Threshold', 'Zone', 'Status'];
     const rows = inventory.map(i => {
@@ -83,7 +120,6 @@ export default function InventoryPage() {
   async function handleCreatePO(skuId: string) {
     const item = inventory.find(i => i.sku === skuId);
     if (!item) return;
-    // Quick PO creation — you'd normally have a form
     try {
       await fetch('/api/purchase-orders', {
         method: 'POST',
@@ -136,9 +172,9 @@ export default function InventoryPage() {
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Export CSV</span>
           </button>
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#10b981] text-black hover:bg-emerald-400 rounded text-sm font-semibold transition">
+          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#10b981] text-black hover:bg-emerald-400 rounded text-sm font-semibold transition shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)]">
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Stock</span>
+            <span className="hidden sm:inline">Add / Create Stock</span>
           </button>
         </div>
       </div>
@@ -288,63 +324,158 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Add Stock Modal */}
+      {/* Add / Create Stock Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center" onClick={() => setShowAddModal(false)}>
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-[#111] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold">Update Stock Level</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Inventory Management</h3>
               <button onClick={() => setShowAddModal(false)} className="text-zinc-500 hover:text-white transition"><X className="w-5 h-5" /></button>
             </div>
             
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">SKU</label>
-                <select 
-                  className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981]"
-                  value={addForm.sku_id}
-                  onChange={e => setAddForm({...addForm, sku_id: e.target.value})}
-                >
-                  <option value="">Select SKU...</option>
-                  {inventory.map(i => <option key={i.sku} value={i.sku}>{i.sku} — {i.name} (Current: {i.qty})</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Quantity</label>
-                <input 
-                  type="number" 
-                  className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono"
-                  placeholder="Enter quantity..."
-                  value={addForm.quantity}
-                  onChange={e => setAddForm({...addForm, quantity: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Mode</label>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => setAddForm({...addForm, mode: 'add'})}
-                    className={`flex-1 py-2 rounded text-sm font-mono border transition ${addForm.mode === 'add' ? 'bg-[#10b981] text-black border-[#10b981]' : 'bg-[#0a0a0a] border-[#333] text-zinc-400 hover:border-zinc-500'}`}
-                  >
-                    + ADD TO STOCK
-                  </button>
-                  <button 
-                    onClick={() => setAddForm({...addForm, mode: 'set'})}
-                    className={`flex-1 py-2 rounded text-sm font-mono border transition ${addForm.mode === 'set' ? 'bg-blue-500 text-white border-blue-500' : 'bg-[#0a0a0a] border-[#333] text-zinc-400 hover:border-zinc-500'}`}
-                  >
-                    = SET LEVEL
-                  </button>
-                </div>
-              </div>
+            {/* Modal Tabs */}
+            <div className="flex gap-2 mb-6 p-1 bg-[#0a0a0a] rounded-lg border border-[#222]">
+               <button 
+                 onClick={() => setModalTab('update')} 
+                 className={`flex-1 text-sm py-2 rounded-md font-medium transition ${modalTab === 'update' ? 'bg-[#222] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+               >
+                 Update Existing
+               </button>
+               <button 
+                 onClick={() => setModalTab('create')} 
+                 className={`flex-1 text-sm py-2 rounded-md font-medium transition flex items-center justify-center gap-2 ${modalTab === 'create' ? 'bg-[#10b981] text-black' : 'text-zinc-500 hover:text-zinc-300'}`}
+               >
+                 <PackagePlus className="w-4 h-4" /> Create New SKU
+               </button>
             </div>
             
-            <button 
-              onClick={handleAddStock} 
-              disabled={saving || !addForm.sku_id || !addForm.quantity}
-              className="w-full mt-6 py-3 bg-[#10b981] text-black font-bold rounded text-sm hover:bg-emerald-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'SAVING...' : 'CONFIRM UPDATE'}
-            </button>
+            {modalTab === 'update' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">SKU</label>
+                  <select 
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981]"
+                    value={addForm.sku_id}
+                    onChange={e => setAddForm({...addForm, sku_id: e.target.value})}
+                  >
+                    <option value="">Select SKU...</option>
+                    {inventory.map(i => <option key={i.sku} value={i.sku}>{i.sku} — {i.name} (Current: {i.qty})</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Quantity</label>
+                  <input 
+                    type="number" 
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono"
+                    placeholder="Enter quantity..."
+                    value={addForm.quantity}
+                    onChange={e => setAddForm({...addForm, quantity: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Mode</label>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setAddForm({...addForm, mode: 'add'})}
+                      className={`flex-1 py-2 rounded text-sm font-mono border transition ${addForm.mode === 'add' ? 'bg-[#10b981] text-black border-[#10b981]' : 'bg-[#0a0a0a] border-[#333] text-zinc-400 hover:border-zinc-500'}`}
+                    >
+                      + ADD TO STOCK
+                    </button>
+                    <button 
+                      onClick={() => setAddForm({...addForm, mode: 'set'})}
+                      className={`flex-1 py-2 rounded text-sm font-mono border transition ${addForm.mode === 'set' ? 'bg-blue-500 text-white border-blue-500' : 'bg-[#0a0a0a] border-[#333] text-zinc-400 hover:border-zinc-500'}`}
+                    >
+                      = SET LEVEL
+                    </button>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleAddStock} 
+                  disabled={saving || !addForm.sku_id || !addForm.quantity}
+                  className="w-full mt-6 py-3 bg-[#10b981] text-black font-bold rounded text-sm hover:bg-emerald-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'SAVING...' : 'CONFIRM UPDATE'}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">SKU ID</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono uppercase"
+                      placeholder="e.g. SKU-NEW-01"
+                      value={createForm.sku_id}
+                      onChange={e => setCreateForm({...createForm, sku_id: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Category</label>
+                    <select 
+                      className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981]"
+                      value={createForm.category}
+                      onChange={e => setCreateForm({...createForm, category: e.target.value})}
+                    >
+                      <option>Perishable</option>
+                      <option>Dry Store</option>
+                      <option>Cold Store</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Product Name</label>
+                  <input 
+                    type="text" 
+                    className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981]"
+                    placeholder="Product name..."
+                    value={createForm.name}
+                    onChange={e => setCreateForm({...createForm, name: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Unit</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981]"
+                      placeholder="kg, pcs..."
+                      value={createForm.unit}
+                      onChange={e => setCreateForm({...createForm, unit: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Threshold</label>
+                    <input 
+                      type="number" 
+                      className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981] font-mono"
+                      placeholder="100"
+                      value={createForm.threshold}
+                      onChange={e => setCreateForm({...createForm, threshold: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Zone</label>
+                    <select 
+                      className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-[#10b981]"
+                      value={createForm.zone}
+                      onChange={e => setCreateForm({...createForm, zone: e.target.value})}
+                    >
+                      <option>ZONE-A</option>
+                      <option>ZONE-B</option>
+                      <option>ZONE-C</option>
+                    </select>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleCreateSKU} 
+                  disabled={saving || !createForm.sku_id || !createForm.name}
+                  className="w-full mt-6 py-3 bg-[#10b981] text-black font-bold rounded text-sm hover:bg-emerald-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'CREATING...' : 'CREATE NEW SKU'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
