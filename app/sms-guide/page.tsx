@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Send, Smartphone, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 type SmsMessage = { id: number; sender: string; message: string; direction: string; created_at: string };
 
@@ -41,13 +42,14 @@ export default function MessageCenter() {
       const data = await res.json();
       
       if (data.success) {
+        toast.success('SMS Sent Successfully!');
         setText('');
         fetchHistory();
       } else {
-        alert(`Failed to send: ${data.error}`);
+        toast.error(`Failed to send: ${data.error}`);
       }
     } catch (err) {
-      alert('Failed to send message');
+      toast.error('Failed to send message');
     } finally {
       setSending(false);
     }

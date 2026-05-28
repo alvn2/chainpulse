@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { supplier_id, items, item_detail, total } = body;
 
-    if (!supplier_id || !items || !item_detail || !total) {
+    if (!supplier_id || !items || !item_detail || total === undefined) {
       return NextResponse.json({ error: 'All fields required' }, { status: 400 });
     }
 

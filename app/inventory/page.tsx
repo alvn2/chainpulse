@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Download, TrendingDown, TrendingUp, AlertCircle, X, PackagePlus, Trash2, Pencil } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 type InventoryItem = { sku: string; name: string; category: string; unit: string; qty: number; threshold: number; warehouse_zone: string };
@@ -59,10 +60,12 @@ export default function InventoryPage() {
           mode: addForm.mode,
         }),
       });
+      toast.success('Stock updated successfully');
       setShowAddModal(false);
       setAddForm({ sku_id: '', quantity: '', mode: 'add' });
       fetchInventory();
     } catch (err) {
+      toast.error('Failed to update stock');
       console.error('Failed to update stock:', err);
     } finally {
       setSaving(false);
@@ -89,13 +92,15 @@ export default function InventoryPage() {
       
       const data = await res.json();
       if (data.error) {
-        alert(data.error);
+        toast.error(data.error);
       } else {
+        toast.success('SKU Created Successfully');
         setShowAddModal(false);
         setCreateForm({ sku_id: '', name: '', category: 'Perishable', unit: 'pcs', threshold: '100', zone: 'ZONE-A' });
         fetchInventory();
       }
     } catch (err) {
+      toast.error('Failed to create SKU');
       console.error('Failed to create SKU:', err);
     } finally {
       setSaving(false);
@@ -120,12 +125,14 @@ export default function InventoryPage() {
       });
       const data = await res.json();
       if (data.error) {
-        alert(data.error);
+        toast.error(data.error);
       } else {
+        toast.success('SKU Updated Successfully');
         setEditForm(null);
         fetchInventory();
       }
     } catch (err) {
+      toast.error('Failed to edit SKU');
       console.error('Failed to edit SKU:', err);
     } finally {
       setSaving(false);
@@ -139,9 +146,13 @@ export default function InventoryPage() {
         method: 'DELETE',
       });
       const data = await res.json();
-      if (data.error) alert(data.error);
-      else fetchInventory();
+      if (data.error) toast.error(data.error);
+      else {
+        toast.success('SKU Deleted Successfully');
+        fetchInventory();
+      }
     } catch (err) {
+      toast.error('Failed to delete SKU');
       console.error('Failed to delete SKU:', err);
     }
   }
@@ -176,8 +187,9 @@ export default function InventoryPage() {
           total: item.threshold * 35,
         }),
       });
-      alert(`Purchase Order created for ${item.name}`);
+      toast.success(`Purchase Order created for ${item.name}`);
     } catch (err) {
+      toast.error('Failed to create PO');
       console.error('Failed to create PO:', err);
     }
   }

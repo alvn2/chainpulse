@@ -61,8 +61,8 @@ export async function POST(req: NextRequest) {
     const id = `SHP-${Date.now().toString().slice(-3)}`;
     
     await sql`
-      INSERT INTO shipments (id, batch_name, origin, destination, driver_name, driver_phone, status, eta, progress)
-      VALUES (${id}, ${batch}, ${origin}, ${destination}, ${driver}, ${driverPhone}, 'LOADING', '-', 0)
+      INSERT INTO shipments (id, batch_name, origin, destination, driver_name, status, eta, progress)
+      VALUES (${id}, ${batch}, ${origin}, ${destination}, ${driver}, 'LOADING', '-', 0)
     `;
 
     // Loop 4: Send Dispatch SMS to Driver

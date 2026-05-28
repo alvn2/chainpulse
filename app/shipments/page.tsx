@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, MapPin, Search, Calendar, X, Plus, Trash2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import toast from 'react-hot-toast';
 
 const ShipmentMap = dynamic(() => import('@/components/ShipmentMap'), { 
   ssr: false,
@@ -46,15 +47,22 @@ export default function ShipmentsPage() {
     
     setSaving(true);
     try {
-      await fetch('/api/shipments', {
+      const res = await fetch('/api/shipments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newShipment),
       });
-      setShowCreateModal(false);
-      setNewShipment({ batch: '', origin: '', destination: '', driver: '', driverPhone: '' });
-      fetchShipments();
+      const data = await res.json();
+      if (data.error) {
+        toast.error(data.error);
+      } else {
+        toast.success('Shipment Created Successfully');
+        setShowCreateModal(false);
+        setNewShipment({ batch: '', origin: '', destination: '', driver: '', driverPhone: '' });
+        fetchShipments();
+      }
     } catch (err) {
+      toast.error('Failed to create shipment');
       console.error('Failed to create shipment:', err);
     } finally {
       setSaving(false);
@@ -68,12 +76,14 @@ export default function ShipmentsPage() {
         method: 'DELETE',
       });
       const data = await res.json();
-      if (data.error) alert(data.error);
+      if (data.error) toast.error(data.error);
       else {
+        toast.success('Shipment Deleted Successfully');
         if (selectedShipment?.id === shipmentId) setSelectedShipment(null);
         fetchShipments();
       }
     } catch (err) {
+      toast.error('Failed to delete shipment');
       console.error('Failed to delete shipment:', err);
     }
   }

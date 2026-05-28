@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Users, Phone, Star, FileText, Plus, X, CheckCircle, Trash2, Pencil, Building2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 type Supplier = { id: string; name: string; location: string; cat: string; phone: string; score: number; activePOs: number };
 type PO = { id: string; supplier_id: string; supplier_name: string; items: string; item_detail: string; total: number; status: string; expected: string; created_at: string };
@@ -45,14 +46,23 @@ export default function SuppliersPage() {
     if (!poForm.supplier_id || !poForm.items || !poForm.item_detail || !poForm.total) return;
     setSaving(true);
     try {
-      await fetch('/api/purchase-orders', {
+      const res = await fetch('/api/purchase-orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...poForm, total: parseFloat(poForm.total) }),
       });
-      setShowPOModal(false);
-      setPOForm({ supplier_id: '', items: '', item_detail: '', total: '' });
-      fetchData();
+      const data = await res.json();
+      if (data.error) {
+        toast.error(data.error);
+      } else {
+        toast.success('Purchase Order Created');
+        setShowPOModal(false);
+        setPOForm({ supplier_id: '', items: '', item_detail: '', total: '' });
+        fetchData();
+      }
+    } catch (err) {
+      toast.error('Failed to create PO');
+      console.error('Failed to create PO:', err);
     } finally {
       setSaving(false);
     }
@@ -63,9 +73,13 @@ export default function SuppliersPage() {
     try {
       const res = await fetch(`/api/purchase-orders?id=${encodeURIComponent(poId)}`, { method: 'DELETE' });
       const data = await res.json();
-      if (data.error) alert(data.error);
-      else fetchData();
+      if (data.error) toast.error(data.error);
+      else {
+        toast.success('PO Deleted');
+        fetchData();
+      }
     } catch (err) {
+      toast.error('Failed to delete PO');
       console.error('Failed to delete PO:', err);
     }
   }
@@ -82,14 +96,16 @@ export default function SuppliersPage() {
       });
       const data = await res.json();
       if (data.error) {
-        alert(data.error);
+        toast.error(data.error);
       } else {
+        toast.success(`Supplier ${mode === 'create' ? 'created' : 'updated'} successfully`);
         setShowSupplierModal(false);
         setEditSupplierForm(null);
         if (mode === 'create') setSupplierForm({ id: '', name: '', location: '', category: 'Perishable', phone: '' });
         fetchData();
       }
     } catch (err) {
+      toast.error(`Failed to ${mode} supplier`);
       console.error(`Failed to ${mode} supplier:`, err);
     } finally {
       setSaving(false);
@@ -101,9 +117,13 @@ export default function SuppliersPage() {
     try {
       const res = await fetch(`/api/suppliers?id=${encodeURIComponent(supId)}`, { method: 'DELETE' });
       const data = await res.json();
-      if (data.error) alert(data.error);
-      else fetchData();
+      if (data.error) toast.error(data.error);
+      else {
+        toast.success('Supplier Deleted');
+        fetchData();
+      }
     } catch (err) {
+      toast.error('Failed to delete supplier');
       console.error('Failed to delete supplier:', err);
     }
   }
@@ -119,13 +139,14 @@ export default function SuppliersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        alert('SMS Sent Successfully!');
+        toast.success('SMS Sent Successfully!');
         setShowSMSModal(false);
         setSmsForm({ phone: '', name: '', text: '' });
       } else {
-        alert(`Failed to send SMS: ${data.error}`);
+        toast.error(`Failed to send SMS: ${data.error}`);
       }
     } catch (err) {
+      toast.error('Failed to send SMS');
       console.error('Failed to send SMS:', err);
     } finally {
       setSendingSMS(false);
@@ -142,12 +163,13 @@ export default function SuppliersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        alert(`PO Received! Automatically added ${data.received} units of ${data.sku} to stock.`);
+        toast.success(`PO Received! Added ${data.received} units of ${data.sku} to stock.`);
         fetchData();
       } else {
-        alert(`Failed to receive: ${data.error}`);
+        toast.error(`Failed to receive: ${data.error}`);
       }
     } catch (err) {
+      toast.error('Failed to receive PO');
       console.error('Failed to receive PO:', err);
     } finally {
       setReceivingId(null);
