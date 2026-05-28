@@ -4,14 +4,15 @@ import React, { useEffect, useState } from 'react';
 import { Truck, MapPin, Signal, SignalZero, User, Hash } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 
-export default function DriverGPSPage({ params }: { params: { id: string } }) {
+export default function DriverGPSPage({ params }: { params: Promise<{ id: string }> }) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
   const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
   
   // Unwrapping params.id in Next 15
-  const shipmentId = React.use(params as any).id as string;
+  const unwrappedParams = React.use(params);
+  const shipmentId = unwrappedParams.id;
 
   useEffect(() => {
     // Connect to the local Socket.IO server
