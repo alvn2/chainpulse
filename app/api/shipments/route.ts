@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse, NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
+import axios from 'axios';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -51,18 +52,45 @@ export async function POST(req: NextRequest) {
   try {
     const sql = getDb();
     const body = await req.json();
-    const { batch, origin, destination, driver } = body;
+    const { batch, origin, destination, driver, driverPhone } = body;
 
-    if (!batch || !origin || !destination || !driver) {
+    if (!batch || !origin || !destination || !driver || !driverPhone) {
       return NextResponse.json({ error: 'All fields required' }, { status: 400 });
     }
 
     const id = `SHP-${Date.now().toString().slice(-3)}`;
     
     await sql`
-      INSERT INTO shipments (id, batch_name, origin, destination, driver_name, status, eta, progress)
-      VALUES (${id}, ${batch}, ${origin}, ${destination}, ${driver}, 'LOADING', '-', 0)
+      INSERT INTO shipments (id, batch_name, origin, destination, driver_name, driver_phone, status, eta, progress)
+      VALUES (${id}, ${batch}, ${origin}, ${destination}, ${driver}, ${driverPhone}, 'LOADING', '-', 0)
     `;
+
+    // Loop 4: Send Dispatch SMS to Driver
+    const username = process.env.AT_USERNAME;
+    const apiKey = process.env.AT_API_KEY;
+    const senderId = process.env.AT_SENDER_ID;
+    
+    if (username && apiKey && username !== 'sandbox' && driverPhone) {
+      try {
+        const text = `${id}: Deliver ${batch} to ${destination}. Text TEMP [value] ${id} at each stop.`;
+        const payload = new URLSearchParams({
+          username,
+          to: driverPhone,
+          message: text,
+        });
+        if (senderId && senderId.trim() !== '') {
+          payload.append('from', senderId);
+        }
+
+        await axios.post(
+          'https://api.africastalking.com/version1/messaging',
+          payload.toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'apiKey': apiKey } }
+        );
+      } catch (smsError) {
+        console.error('Failed to send Dispatch SMS:', smsError);
+      }
+    }
 
     return NextResponse.json({ success: true, id });
   } catch (error: any) {

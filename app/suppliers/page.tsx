@@ -11,8 +11,11 @@ export default function SuppliersPage() {
   const [pos, setPOs] = useState<PO[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPOModal, setShowPOModal] = useState(false);
+  const [showSMSModal, setShowSMSModal] = useState(false);
   const [poForm, setPOForm] = useState({ supplier_id: '', items: '', item_detail: '', total: '' });
+  const [smsForm, setSmsForm] = useState({ phone: '', name: '', text: '' });
   const [saving, setSaving] = useState(false);
+  const [sendingSMS, setSendingSMS] = useState(false);
   const [receivingId, setReceivingId] = useState<string | null>(null);
 
   async function fetchData() {
@@ -49,6 +52,30 @@ export default function SuppliersPage() {
       console.error('Failed to create PO:', err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSendSMS() {
+    if (!smsForm.phone || !smsForm.text) return;
+    setSendingSMS(true);
+    try {
+      const res = await fetch('/api/sms/test-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: smsForm.phone, text: smsForm.text }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('SMS Sent Successfully!');
+        setShowSMSModal(false);
+        setSmsForm({ phone: '', name: '', text: '' });
+      } else {
+        alert(`Failed to send SMS: ${data.error}`);
+      }
+    } catch (err) {
+      console.error('Failed to send SMS:', err);
+    } finally {
+      setSendingSMS(false);
     }
   }
 
@@ -135,16 +162,22 @@ export default function SuppliersPage() {
               </div>
             </div>
 
-            <div className="mt-auto grid grid-cols-2 gap-3">
+            <div className="mt-auto grid grid-cols-3 gap-3">
                <button 
                  onClick={() => { setPOForm({ ...poForm, supplier_id: sup.id }); setShowPOModal(true); }}
                  className="py-2 bg-[#0a0a0a] border border-[#333] text-zinc-300 rounded text-xs font-mono tracking-widest hover:bg-zinc-800 hover:text-white transition group-hover:border-zinc-500"
                >
                  NEW PO
                </button>
+               <button 
+                 onClick={() => { setSmsForm({ phone: sup.phone, name: sup.name, text: '' }); setShowSMSModal(true); }}
+                 className="py-2 bg-emerald-950/20 border border-emerald-900/50 text-emerald-400 rounded text-xs font-mono tracking-widest hover:bg-emerald-900/40 hover:border-emerald-500 transition text-center"
+               >
+                 SMS
+               </button>
                <a 
                  href={`tel:${sup.phone}`}
-                 className="py-2 bg-blue-950/20 border border-blue-900/50 text-blue-400 rounded text-xs font-mono tracking-widest hover:bg-blue-900/40 hover:border-blue-500 transition text-center"
+                 className="py-2 bg-blue-950/20 border border-blue-900/50 text-blue-400 rounded text-xs font-mono tracking-widest hover:bg-blue-900/40 hover:border-blue-500 transition text-center flex items-center justify-center"
                >
                  CALL
                </a>
@@ -248,6 +281,47 @@ export default function SuppliersPage() {
               className="w-full mt-6 py-3 bg-amber-500 text-black font-bold rounded text-sm hover:bg-amber-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? 'CREATING...' : 'CREATE PURCHASE ORDER'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Send SMS Modal */}
+      {showSMSModal && (
+        <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center" onClick={() => setShowSMSModal(false)}>
+          <div className="bg-[#111] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Phone className="w-5 h-5 text-emerald-500" /> Message Supplier
+              </h3>
+              <button onClick={() => setShowSMSModal(false)} className="text-zinc-500 hover:text-white transition"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">To</label>
+                <div className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm text-zinc-300 font-mono">
+                  {smsForm.name} ({smsForm.phone})
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Message</label>
+                <textarea 
+                  rows={4}
+                  className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-emerald-500 font-mono resize-none text-zinc-200"
+                  placeholder="Type your message here..." 
+                  value={smsForm.text} 
+                  onChange={e => setSmsForm({...smsForm, text: e.target.value})} 
+                />
+              </div>
+            </div>
+            
+            <button 
+              onClick={handleSendSMS} 
+              disabled={sendingSMS || !smsForm.text}
+              className="w-full mt-6 py-3 bg-emerald-600 text-white font-bold rounded text-sm hover:bg-emerald-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sendingSMS ? 'SENDING...' : 'SEND SMS'}
             </button>
           </div>
         </div>

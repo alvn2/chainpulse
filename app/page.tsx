@@ -20,8 +20,7 @@ export default function LandingPage() {
           <span className="text-xl font-bold tracking-tighter">Chain<span className="text-[#10b981]">Pulse</span></span>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/login" className="text-sm font-medium text-zinc-400 hover:text-white transition">Log in</Link>
-          <Link href="/signup" className="text-sm font-medium bg-white text-black px-4 py-2 rounded-full hover:bg-zinc-200 transition">Get Started</Link>
+          <Link href="/login" className="text-sm font-medium bg-white text-black px-6 py-2 rounded-full hover:bg-zinc-200 transition">Employee Login</Link>
         </div>
       </nav>
 
@@ -38,15 +37,12 @@ export default function LandingPage() {
         </h1>
         
         <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Real-time cold chain monitoring, SMS-driven inventory management, and automated purchase orders. Built for high-velocity African supply chains.
+          Internal operations portal for real-time cold chain monitoring, SMS-driven logistics, and warehouse inventory management.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-          <Link href="/signup" className="w-full sm:w-auto px-8 py-4 bg-[#10b981] text-black rounded-full font-bold text-lg hover:bg-emerald-400 transition flex items-center justify-center gap-2">
-            Start Free Trial <ArrowRight className="w-5 h-5" />
-          </Link>
-          <Link href="/login" className="w-full sm:w-auto px-8 py-4 bg-[#111] border border-[#333] text-white rounded-full font-bold text-lg hover:bg-[#222] transition flex items-center justify-center">
-            View Demo Dashboard
+          <Link href="/dashboard" className="w-full sm:w-auto px-8 py-4 bg-[#10b981] text-black rounded-full font-bold text-lg hover:bg-emerald-400 transition flex items-center justify-center gap-2">
+            Access HQ Dashboard <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
 

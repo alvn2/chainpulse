@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { io } from 'socket.io-client';
 
 // Fix for default Leaflet marker icon in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -47,12 +48,37 @@ export default function ShipmentMap({ origin, destination, progress, shipmentId,
   const originCoords = LOCATIONS[origin] || LOCATIONS['Naivasha Farm'];
   const destCoords = LOCATIONS[destination] || LOCATIONS['JKIA Export Hub'];
 
-  // Calculate truck position based on progress
+  // Calculate default truck position based on progress (fallback)
   const latDiff = destCoords[0] - originCoords[0];
   const lngDiff = destCoords[1] - originCoords[1];
-  const currentLat = originCoords[0] + (latDiff * (progress / 100));
-  const currentLng = originCoords[1] + (lngDiff * (progress / 100));
-  const currentCoords: [number, number] = [currentLat, currentLng];
+  const defaultLat = originCoords[0] + (latDiff * (progress / 100));
+  const defaultLng = originCoords[1] + (lngDiff * (progress / 100));
+  
+  const [currentCoords, setCurrentCoords] = useState<[number, number]>([defaultLat, defaultLng]);
+  const [isLiveTracking, setIsLiveTracking] = useState(false);
+
+  useEffect(() => {
+    // Reset coords if shipment changes
+    setCurrentCoords([defaultLat, defaultLng]);
+    setIsLiveTracking(false);
+
+    // Connect to Socket.IO for real-time telemetry
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+    const socket = io(socketUrl);
+    
+    socket.emit('join_shipment', shipmentId);
+    
+    socket.on('gps_update', (data) => {
+      if (data.shipmentId === shipmentId) {
+        setCurrentCoords([data.lat, data.lng]);
+        setIsLiveTracking(true);
+      }
+    });
+
+    return () => {
+      socket.close();
+    };
+  }, [shipmentId, defaultLat, defaultLng]);
 
   // Bounds to fit both origin and destination
   const bounds = L.latLngBounds(originCoords, destCoords);
@@ -96,7 +122,7 @@ export default function ShipmentMap({ origin, destination, progress, shipmentId,
         </Marker>
 
         {/* Truck Marker */}
-        {progress > 0 && progress < 100 && (
+        {(progress > 0 && progress < 100) || isLiveTracking ? (
           <Marker position={currentCoords} icon={truckIcon}>
             <Popup>
               <div className="font-mono text-xs font-bold text-black">
@@ -104,11 +130,15 @@ export default function ShipmentMap({ origin, destination, progress, shipmentId,
                 <br />
                 Status: {status}
                 <br />
-                Progress: {progress}%
+                {isLiveTracking ? (
+                  <span className="text-emerald-600 animate-pulse">● LIVE GPS TRACKING</span>
+                ) : (
+                  `Progress: ${progress}%`
+                )}
               </div>
             </Popup>
           </Marker>
-        )}
+        ) : null}
       </MapContainer>
     </div>
   );

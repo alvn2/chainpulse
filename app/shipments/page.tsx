@@ -18,7 +18,7 @@ export default function ShipmentsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState({ batch: '', origin: '', destination: '', driver: '' });
+  const [newShipment, setNewShipment] = useState({ batch: '', origin: '', destination: '', driver: '', driverPhone: '' });
   const [saving, setSaving] = useState(false);
 
   async function fetchShipments() {
@@ -40,17 +40,19 @@ export default function ShipmentsPage() {
     fetchShipments();
   }, [filter]);
 
-  async function handleCreateShipment() {
-    if (!createForm.batch || !createForm.origin || !createForm.destination || !createForm.driver) return;
+  async function handleCreateShipment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newShipment.batch || !newShipment.origin || !newShipment.destination || !newShipment.driver || !newShipment.driverPhone) return;
+    
     setSaving(true);
     try {
       await fetch('/api/shipments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createForm),
+        body: JSON.stringify(newShipment),
       });
       setShowCreateModal(false);
-      setCreateForm({ batch: '', origin: '', destination: '', driver: '' });
+      setNewShipment({ batch: '', origin: '', destination: '', driver: '', driverPhone: '' });
       fetchShipments();
     } catch (err) {
       console.error('Failed to create shipment:', err);
@@ -194,10 +196,19 @@ export default function ShipmentsPage() {
 
              {selectedShipment && (
                <div className="h-[250px] bg-[#161616] p-6 flex flex-col justify-between shrink-0">
-                 <div>
+                  <div>
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-mono text-xl font-bold text-white mb-1">{selectedShipment.id}</h3>
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-mono text-xl font-bold text-white">{selectedShipment.id}</h3>
+                          <a 
+                            href={`/driver/${selectedShipment.id}`} 
+                            target="_blank"
+                            className="bg-blue-900/40 border border-blue-500/50 text-blue-400 text-[10px] px-2 py-0.5 rounded font-mono hover:bg-blue-500 hover:text-white transition-colors"
+                          >
+                            OPEN DRIVER TERMINAL ↗
+                          </a>
+                        </div>
                         <p className="text-zinc-400 text-sm">{selectedShipment.batch}</p>
                       </div>
                       <StatusBadge status={selectedShipment.status} />
@@ -231,9 +242,10 @@ export default function ShipmentsPage() {
       {showCreateModal && (
         <div className="fixed inset-0 modal-overlay z-50 flex items-center justify-center" onClick={() => setShowCreateModal(false)}>
           <div className="bg-[#111] border border-[#333] rounded-xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <form onSubmit={handleCreateShipment}>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold flex items-center gap-2"><Truck className="w-5 h-5 text-blue-400" /> New Shipment</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-zinc-500 hover:text-white transition"><X className="w-5 h-5" /></button>
+              <button type="button" onClick={() => setShowCreateModal(false)} className="text-zinc-500 hover:text-white transition"><X className="w-5 h-5" /></button>
             </div>
             
             <div className="space-y-4">
@@ -241,7 +253,6 @@ export default function ShipmentsPage() {
                 { label: 'Batch Name', key: 'batch' as const, placeholder: 'e.g. Naivasha Roses B.008' },
                 { label: 'Origin', key: 'origin' as const, placeholder: 'e.g. Naivasha Farm' },
                 { label: 'Destination', key: 'destination' as const, placeholder: 'e.g. JKIA Export Hub' },
-                { label: 'Driver', key: 'driver' as const, placeholder: 'e.g. Kipchoge K.' },
               ].map(field => (
                 <div key={field.key}>
                   <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">{field.label}</label>
@@ -249,20 +260,31 @@ export default function ShipmentsPage() {
                     type="text" 
                     className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500"
                     placeholder={field.placeholder}
-                    value={createForm[field.key]}
-                    onChange={e => setCreateForm({...createForm, [field.key]: e.target.value})}
+                    value={newShipment[field.key]}
+                    onChange={e => setNewShipment({...newShipment, [field.key]: e.target.value})}
+                    required
                   />
                 </div>
-              ))}
-            </div>
-            
-            <button 
-              onClick={handleCreateShipment} 
-              disabled={saving || !createForm.batch || !createForm.origin || !createForm.destination || !createForm.driver}
-              className="w-full mt-6 py-3 bg-blue-500 text-white font-bold rounded text-sm hover:bg-blue-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'CREATING...' : 'CREATE SHIPMENT'}
-            </button>
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Driver Name</label>
+                  <input type="text" className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500 font-mono"
+                    value={newShipment.driver} onChange={e => setNewShipment({...newShipment, driver: e.target.value})} placeholder="e.g. Omondi" required />
+                </div>
+                <div>
+                  <label className="text-xs font-mono text-zinc-500 uppercase tracking-wider block mb-1">Driver Phone</label>
+                  <input type="text" className="w-full bg-[#0a0a0a] border border-[#333] rounded px-3 py-2 text-sm outline-none focus:border-blue-500 font-mono"
+                    value={newShipment.driverPhone} onChange={e => setNewShipment({...newShipment, driverPhone: e.target.value})} placeholder="e.g. +2547XXXXXXXX" required />
+                </div>
+              </div>
+              
+              <button 
+                type="submit"
+                disabled={saving || !newShipment.batch || !newShipment.origin || !newShipment.destination || !newShipment.driver || !newShipment.driverPhone}
+                className="w-full mt-6 py-3 bg-blue-500 text-white font-bold rounded text-sm hover:bg-blue-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'CREATING...' : 'CREATE SHIPMENT'}
+              </button>
+            </form>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import axios from 'axios';
 
 export async function GET() {
   try {
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'All fields required' }, { status: 400 });
     }
 
-    const [supplier] = await sql`SELECT name FROM suppliers WHERE id = ${supplier_id}`;
+    const [supplier] = await sql`SELECT name, phone FROM suppliers WHERE id = ${supplier_id}`;
     if (!supplier) {
       return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
     }
@@ -36,6 +37,33 @@ export async function POST(req: Request) {
       INSERT INTO purchase_orders (id, supplier_id, supplier_name, items, item_detail, total, status, expected)
       VALUES (${id}, ${supplier_id}, ${supplier.name}, ${items}, ${item_detail}, ${total}, 'PENDING', 'In 5 Days')
     `;
+
+    // Loop 1: Send SMS to Supplier
+    const username = process.env.AT_USERNAME;
+    const apiKey = process.env.AT_API_KEY;
+    const senderId = process.env.AT_SENDER_ID;
+    
+    if (username && apiKey && username !== 'sandbox' && supplier.phone) {
+      try {
+        const text = `${id}: ${item_detail} requested. Reply CONFIRM ${id} to accept.`;
+        const payload = new URLSearchParams({
+          username,
+          to: supplier.phone,
+          message: text,
+        });
+        if (senderId && senderId.trim() !== '') {
+          payload.append('from', senderId);
+        }
+
+        await axios.post(
+          'https://api.africastalking.com/version1/messaging',
+          payload.toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'apiKey': apiKey } }
+        );
+      } catch (smsError) {
+        console.error('Failed to send PO SMS:', smsError);
+      }
+    }
 
     return NextResponse.json({ success: true, id });
   } catch (error: any) {

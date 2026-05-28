@@ -26,8 +26,9 @@ export async function POST(req: NextRequest) {
     const command = parts[0]?.toUpperCase();
 
     let replyText = `Received command ${command}`;
-    let triggerAlert = false;
-    let alertMsg = '';
+    
+    // Array to hold outbound SMS we need to send
+    const outboundTasks: { phone: string, text: string }[] = [];
 
     switch (command) {
       case 'TEMP':
@@ -42,9 +43,11 @@ export async function POST(req: NextRequest) {
           if (value > 8) {
             // Update shipment status to BREACH
             await sql`UPDATE shipments SET status = 'BREACH' WHERE id = ${shipmentId} AND status != 'DELIVERED'`;
-            triggerAlert = true;
-            alertMsg = `CRITICAL: Temp breach ${value}°C for shipment ${shipmentId}`;
+            const alertMsg = `CRITICAL: Temp breach ${value}°C for shipment ${shipmentId}`;
             await sql`INSERT INTO alerts (type, severity, message) VALUES ('TEMP BREACH', 'HIGH', ${alertMsg})`;
+            // Queue SMS to Manager
+            const managerPhone = process.env.AT_MANAGER_PHONE || sender;
+            if (managerPhone) outboundTasks.push({ phone: managerPhone, text: alertMsg });
           }
         }
         break;
@@ -57,14 +60,28 @@ export async function POST(req: NextRequest) {
           await sql`UPDATE stock_levels SET quantity = ${qty}, last_updated = NOW() WHERE sku_id = ${skuId}`;
           replyText = `Set stock for ${skuId} to ${qty}.`;
 
-          // Check threshold
+          // Check threshold for Auto-Reorder (Loop 3)
           const [check] = await sql`
             SELECT sl.quantity, s.reorder_threshold, s.name 
             FROM stock_levels sl JOIN skus s ON sl.sku_id = s.id 
             WHERE sl.sku_id = ${skuId}
           `;
           if (check && check.quantity <= check.reorder_threshold) {
-            await sql`INSERT INTO alerts (type, severity, message) VALUES ('LOW STOCK', 'MEDIUM', ${`${check.name} (${skuId}) at ${check.quantity}/${check.reorder_threshold}.`})`;
+            const alertText = `${check.name} (${skuId}) at ${check.quantity}/${check.reorder_threshold}.`;
+            await sql`INSERT INTO alerts (type, severity, message) VALUES ('LOW STOCK', 'MEDIUM', ${alertText})`;
+            
+            // Auto create PO
+            const [supplier] = await sql`SELECT id, name, phone FROM suppliers LIMIT 1`; // Grab first supplier as fallback if sku doesn't map directly
+            if (supplier) {
+               const poId = `PO-${2950 + Math.floor(Math.random() * 100)}`;
+               const poQty = check.reorder_threshold * 2;
+               await sql`
+                 INSERT INTO purchase_orders (id, supplier_id, supplier_name, items, item_detail, total, status, expected)
+                 VALUES (${poId}, ${supplier.id}, ${supplier.name}, ${skuId}, ${poQty.toString() + ' pcs'}, ${poQty * 100}, 'PENDING', 'In 5 Days')
+               `;
+               const poMsg = `Auto-reorder: ${skuId} stock at ${check.quantity} (threshold ${check.reorder_threshold}). ${poId} raised. Reply CONFIRM ${poId}.`;
+               if (supplier.phone) outboundTasks.push({ phone: supplier.phone, text: poMsg });
+            }
           }
         }
         break;
@@ -76,13 +93,17 @@ export async function POST(req: NextRequest) {
           const worker = sender || 'Unknown';
           
           // Update stock
-          await sql`UPDATE stock_levels SET quantity = quantity + ${qty}, last_updated = NOW() WHERE sku_id = ${skuId}`;
+          const [updatedStock] = await sql`UPDATE stock_levels SET quantity = quantity + ${qty}, last_updated = NOW() WHERE sku_id = ${skuId} RETURNING quantity`;
+          const newTotal = updatedStock ? updatedStock.quantity : qty;
           
           // Create receiving log
           const logId = `RCV-${Date.now().toString().slice(-6)}`;
           await sql`INSERT INTO receiving_logs (id, worker, sku_id, quantity, sms_text) VALUES (${logId}, ${worker}, ${skuId}, ${qty}, ${message})`;
           
-          replyText = `Added ${qty} to ${skuId}.`;
+          replyText = `RECV confirmed. ${skuId} now at ${newTotal} units.`;
+          
+          // Loop 2: Reply to worker
+          if (sender) outboundTasks.push({ phone: sender, text: replyText });
         }
         break;
 
@@ -113,39 +134,35 @@ export async function POST(req: NextRequest) {
 
     console.log(`[AT Webhook] From: ${sender} | Command: ${command} | Reply: ${replyText}`);
 
-    // If there's an alert, notify manager via Outbound AT API
-    if (triggerAlert) {
-      try {
-        const username = process.env.AT_USERNAME || 'sandbox';
-        const apiKey = process.env.AT_API_KEY;
-        const senderId = process.env.AT_SENDER_ID;
-        
-        if (apiKey) {
-          const payload = new URLSearchParams({
-            username,
-            to: sender || '+254700000000',
-            message: alertMsg,
-            from: senderId || '',
-          });
-
-          await axios.post(
-            'https://api.africastalking.com/version1/messaging',
-            payload.toString(),
-            {
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'apiKey': apiKey,
-                'Accept': 'application/json',
-              },
+    // Process outbound tasks (AT SMS API)
+    if (outboundTasks.length > 0) {
+      const username = process.env.AT_USERNAME;
+      const apiKey = process.env.AT_API_KEY;
+      const senderId = process.env.AT_SENDER_ID;
+      
+      if (username && apiKey && username !== 'sandbox') {
+        for (const task of outboundTasks) {
+          try {
+            const payload = new URLSearchParams({
+              username,
+              to: task.phone,
+              message: task.text,
+            });
+            if (senderId && senderId.trim() !== '') {
+              payload.append('from', senderId);
             }
-          );
-          console.log(`[AT SMS Sent] Alert: ${alertMsg}`);
+  
+            await axios.post(
+              'https://api.africastalking.com/version1/messaging',
+              payload.toString(),
+              { headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'apiKey': apiKey } }
+            );
+            console.log(`[AT SMS Sent] To: ${task.phone} | Msg: ${task.text}`);
+            await sql`INSERT INTO sms_messages (sender, message, direction) VALUES (${task.phone}, ${task.text}, 'OUTBOUND')`;
+          } catch (err) {
+            console.error('Failed to send outbound SMS task', err);
+          }
         }
-        
-        // Log outbound message to DB (even if API key is missing for demo purposes)
-        await sql`INSERT INTO sms_messages (sender, message, direction) VALUES ('System', ${alertMsg}, 'OUTBOUND')`;
-      } catch (err) {
-        console.error('Failed to send outbound SMS', err);
       }
     }
 
